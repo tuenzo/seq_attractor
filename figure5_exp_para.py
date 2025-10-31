@@ -166,14 +166,15 @@ def single_trial_task(trial_params):
     )
     
     # 测试鲁棒性
+    random_times=1
     robustness = network.test_robustness(
         noise_levels=np.array([noise_level]),
-        num_trials=1,
+        num_trials=random_times,
         verbose=False
     )
     
-    # 返回是否成功
-    return robustness[0] > 0.5
+    # 返回成功率
+    return robustness[0]
 
 
 def run_parallel_trials(base_params, num_trials, V_only=False, n_jobs=-1):
@@ -265,85 +266,88 @@ def run_figure5_experiments_parallel(num_trials: int = 100,
     print(f"CPU配置: 总共{total_cores}核，使用{n_cores}核，保留{reserved_cores}核给系统")
     print(f"预计加速比: ~{n_cores}x")
     print("="*70)
-    
-    # ============================================================
-    # Figure 5(a): 扫描序列长度T
-    # ============================================================
-    print("\n" + "="*70)
-    print("Figure 5(a): 扫描序列长度T (固定 N=100, M=500)")
-    print("="*70)
-    
-    base_params_a = {
-        'N_v': 100,
-        'N_h': 500,
-        'eta': 0.01,
-        'kappa': 1.0,
-        'num_epochs': num_epochs
-    }
+    a=False
+    if a:
+        
+        # ============================================================
+        # Figure 5(a): 扫描序列长度T
+        # ============================================================
+        print("\n" + "="*70)
+        print("Figure 5(a): 扫描序列长度T (固定 N=100, M=500)")
+        print("="*70)
+        
+        base_params_a = {
+            'N_v': 100,
+            'N_h': 500,
+            'eta': 0.001,
+            'kappa': 1.0,
+            'num_epochs': num_epochs
+        }
 
-    if T_values is None:
-        T_values = np.linspace(10, 140, 8, dtype=int)
+        if T_values is None:
+            T_values = np.linspace(10, 140, 8, dtype=int)
 
-    print("\n--- 只训练 V ---")
-    results_v_only_a = []
-    for i, T in enumerate(T_values):
-        print(f"\n[{i+1}/{len(T_values)}] T = {T}")
+        print("\n--- 只训练 V ---")
+        results_v_only_a = []
+        for i, T in enumerate(T_values):
+            print(f"\n[{i+1}/{len(T_values)}] T = {T}")
+            
+            params = base_params_a.copy()
+            params['T'] = T
+            params['noise_level'] = noise_num / params['N_v']
+            
+            success_rate, success_count = run_parallel_trials(
+                params, num_trials, V_only=True, n_jobs=n_jobs
+            )
+            
+            results_v_only_a.append({
+                'T': T,
+                'recall_accuracy': success_rate,
+                'N_v': params['N_v'],
+                'N_h': params['N_h']
+            })
+            print(f"  成功率: {success_rate*100:.1f}% ({success_count}/{num_trials})")
         
-        params = base_params_a.copy()
-        params['T'] = T
-        params['noise_level'] = noise_num / params['N_v']
+        print("\n--- 训练 U+V ---")
+        results_uv_a = []
+        for i, T in enumerate(T_values):
+            print(f"\n[{i+1}/{len(T_values)}] T = {T}")
+            
+            params = base_params_a.copy()
+            params['T'] = T
+            params['noise_level'] = noise_num / params['N_v']
+            
+            success_rate, success_count = run_parallel_trials(
+                params, num_trials, V_only=False, n_jobs=n_jobs
+            )
+            
+            results_uv_a.append({
+                'T': T,
+                'recall_accuracy': success_rate,
+                'N_v': params['N_v'],
+                'N_h': params['N_h']
+            })
+            print(f"  成功率: {success_rate*100:.1f}% ({success_count}/{num_trials})")
         
-        success_rate, success_count = run_parallel_trials(
-            params, num_trials, V_only=True, n_jobs=n_jobs
-        )
-        
-        results_v_only_a.append({
-            'T': T,
-            'recall_accuracy': success_rate,
-            'N_v': params['N_v'],
-            'N_h': params['N_h']
-        })
-        print(f"  成功率: {success_rate*100:.1f}% ({success_count}/{num_trials})")
-    
-    print("\n--- 训练 U+V ---")
-    results_uv_a = []
-    for i, T in enumerate(T_values):
-        print(f"\n[{i+1}/{len(T_values)}] T = {T}")
-        
-        params = base_params_a.copy()
-        params['T'] = T
-        params['noise_level'] = noise_num / params['N_v']
-        
-        success_rate, success_count = run_parallel_trials(
-            params, num_trials, V_only=False, n_jobs=n_jobs
-        )
-        
-        results_uv_a.append({
-            'T': T,
-            'recall_accuracy': success_rate,
-            'N_v': params['N_v'],
-            'N_h': params['N_h']
-        })
-        print(f"  成功率: {success_rate*100:.1f}% ({success_count}/{num_trials})")
-    
-    # 绘制Figure 5(a)
-    plot_figure5(results_v_only_a, results_uv_a, 
-                param_name='T',
-                param_values=T_values,
-                save_path=os.path.join(fig5_dir, "figure5a.png"),
-                show_plot=show_images)
+        # 绘制Figure 5(a)
+        plot_figure5(results_v_only_a, results_uv_a, 
+                    param_name='T',
+                    param_values=T_values,
+                    save_path=os.path.join(fig5_dir, "figure5a.png"),
+                    show_plot=show_images)
     
     # ============================================================
     # Figure 5(b): 扫描隐藏层神经元数量N_h
     # ============================================================
     print("\n" + "="*70)
-    print("Figure 5(b): 扫描隐藏层大小M (固定 N=100, T=70)")
+    fix_T=70
+    print("Figure 5(b): 扫描隐藏层大小M (固定 N=100, T=%d)" % fix_T)
     print("="*70)
     
     base_params_b = {
         'N_v': 100,
-        'T': 70,
-        'eta': 0.01,
+        'T': fix_T,
+        'eta': 0.001,
         'kappa': 1.0,
         'num_epochs': num_epochs
     }
@@ -449,9 +453,9 @@ if __name__ == "__main__":
     T_values = np.linspace(10, 140, 14, dtype=int)
     N_h_values = np.linspace(100, 1000, 10, dtype=int)
     results_test = run_figure5_experiments_parallel(
-        num_trials=50,       # 快速测试用10次
+        num_trials=100,       # 快速测试用
         noise_num=10,
-        num_epochs=500,
+        num_epochs=300,
         T_values=T_values,
         N_h_values=N_h_values,
         output_dir="./figure5_results",

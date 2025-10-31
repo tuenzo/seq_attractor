@@ -42,7 +42,8 @@ class SequenceAttractorNetwork:
         # 初始化权重矩阵
         self.U = np.random.randn(self.N_h, N_v) * 1e-6
         self.V = np.random.randn(N_v, self.N_h) * 1e-6
-        self.P = np.random.randn(self.N_h, N_v) / np.sqrt(N_v)
+        self.P = np.random.randn(self.N_h, N_v) * 1e-6
+
         
         # 训练历史
         self.mu_history = []
