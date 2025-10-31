@@ -61,7 +61,7 @@ def get_optimal_n_jobs(n_jobs=-1, reserve_ratio=0.25):
 def plot_figure5(results_v_only, results_uv, 
                 param_name: str, 
                 param_values: np.ndarray,
-                save_path: str = None,
+                save_path: Optional[str] = None,
                 show_plot: bool = True):
     """
     绘制Figure 5风格的对比图
