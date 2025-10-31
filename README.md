@@ -2,3 +2,5 @@
 
 依赖：
 pip install numpy matplotlib tqdm
+使用命令：
+pip install -r requirements.txt
