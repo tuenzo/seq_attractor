@@ -121,7 +121,7 @@ def run_figure5_experiments(num_trials: int = 100,
         'kappa': 1.0
     }
     
-    T_values = np.linspace(10, 150, 20, dtype=int)
+    T_values = np.linspace(10, 140, 7, dtype=int)
     
     print("\n--- 只训练 V ---")
     results_v_only_a = []
@@ -227,7 +227,7 @@ def run_figure5_experiments(num_trials: int = 100,
         'kappa': 1.0
     }
 
-    N_h_values = np.linspace(100, 1000, 200, dtype=int)
+    N_h_values = np.linspace(100, 1000, 5, dtype=int)
     noise_level_b = noise_num / base_params_b['N_v']
     
     print("\n--- 只训练 V ---")
@@ -361,7 +361,7 @@ if __name__ == "__main__":
     results_test = run_figure5_experiments(
         num_trials=10,       # 快速测试用10次
         noise_num=10,
-        num_epochs=500,
+        num_epochs=300,
         output_dir="./figure5_results",
         show_images=True
     )

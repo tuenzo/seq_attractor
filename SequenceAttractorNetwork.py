@@ -226,7 +226,7 @@ class SequenceAttractorNetwork:
         }
     
     def test_robustness(self, noise_levels: np.ndarray, 
-                   num_trials: int = 100, verbose: bool = True) -> np.ndarray:
+                   num_trials: int = 50, verbose: bool = True) -> np.ndarray:
         """
         测试噪声鲁棒性（符合论文标准）
         
