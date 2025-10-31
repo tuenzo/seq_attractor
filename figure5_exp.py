@@ -15,7 +15,7 @@ import os
 
 def plot_figure5(results_v_only, results_uv, 
                 param_name: str, 
-                param_values: list,
+                param_values: np.ndarray,
                 save_path: str = None,
                 show_plot: bool = True):
     """
