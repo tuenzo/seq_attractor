@@ -266,76 +266,74 @@ def run_figure5_experiments_parallel(num_trials: int = 100,
     print(f"CPU配置: 总共{total_cores}核，使用{n_cores}核，保留{reserved_cores}核给系统")
     print(f"预计加速比: ~{n_cores}x")
     print("="*70)
-    a=False
-    if a:
-        
-        # ============================================================
-        # Figure 5(a): 扫描序列长度T
-        # ============================================================
-        print("\n" + "="*70)
-        print("Figure 5(a): 扫描序列长度T (固定 N=100, M=500)")
-        print("="*70)
-        
-        base_params_a = {
-            'N_v': 100,
-            'N_h': 500,
-            'eta': 0.001,
-            'kappa': 1.0,
-            'num_epochs': num_epochs
-        }
-
-        if T_values is None:
-            T_values = np.linspace(10, 140, 8, dtype=int)
-
-        print("\n--- 只训练 V ---")
-        results_v_only_a = []
-        for i, T in enumerate(T_values):
-            print(f"\n[{i+1}/{len(T_values)}] T = {T}")
-            
-            params = base_params_a.copy()
-            params['T'] = T
-            params['noise_level'] = noise_num / params['N_v']
-            
-            success_rate, success_count = run_parallel_trials(
-                params, num_trials, V_only=True, n_jobs=n_jobs
-            )
-            
-            results_v_only_a.append({
-                'T': T,
-                'recall_accuracy': success_rate,
-                'N_v': params['N_v'],
-                'N_h': params['N_h']
-            })
-            print(f"  成功率: {success_rate*100:.1f}% ({success_count}/{num_trials})")
-        
-        print("\n--- 训练 U+V ---")
-        results_uv_a = []
-        for i, T in enumerate(T_values):
-            print(f"\n[{i+1}/{len(T_values)}] T = {T}")
-            
-            params = base_params_a.copy()
-            params['T'] = T
-            params['noise_level'] = noise_num / params['N_v']
-            
-            success_rate, success_count = run_parallel_trials(
-                params, num_trials, V_only=False, n_jobs=n_jobs
-            )
-            
-            results_uv_a.append({
-                'T': T,
-                'recall_accuracy': success_rate,
-                'N_v': params['N_v'],
-                'N_h': params['N_h']
-            })
-            print(f"  成功率: {success_rate*100:.1f}% ({success_count}/{num_trials})")
-        
-        # 绘制Figure 5(a)
-        plot_figure5(results_v_only_a, results_uv_a, 
-                    param_name='T',
-                    param_values=T_values,
-                    save_path=os.path.join(fig5_dir, "figure5a.png"),
-                    show_plot=show_images)
+   
+    # ============================================================
+    # Figure 5(a): 扫描序列长度T
+    # ============================================================
+    print("\n" + "="*70)
+    print("Figure 5(a): 扫描序列长度T (固定 N=100, M=500)")
+    print("="*70)
     
+    base_params_a = {
+        'N_v': 100,
+        'N_h': 500,
+        'eta': 0.001,
+        'kappa': 1.0,
+        'num_epochs': num_epochs
+    }
+
+    if T_values is None:
+        T_values = np.linspace(10, 140, 8, dtype=int)
+
+    print("\n--- 只训练 V ---")
+    results_v_only_a = []
+    for i, T in enumerate(T_values):
+        print(f"\n[{i+1}/{len(T_values)}] T = {T}")
+        
+        params = base_params_a.copy()
+        params['T'] = T
+        params['noise_level'] = noise_num / params['N_v']
+        
+        success_rate, success_count = run_parallel_trials(
+            params, num_trials, V_only=True, n_jobs=n_jobs
+        )
+        
+        results_v_only_a.append({
+            'T': T,
+            'recall_accuracy': success_rate,
+            'N_v': params['N_v'],
+            'N_h': params['N_h']
+        })
+        print(f"  成功率: {success_rate*100:.1f}% ({success_count}/{num_trials})")
+    
+    print("\n--- 训练 U+V ---")
+    results_uv_a = []
+    for i, T in enumerate(T_values):
+        print(f"\n[{i+1}/{len(T_values)}] T = {T}")
+        
+        params = base_params_a.copy()
+        params['T'] = T
+        params['noise_level'] = noise_num / params['N_v']
+        
+        success_rate, success_count = run_parallel_trials(
+            params, num_trials, V_only=False, n_jobs=n_jobs
+        )
+        
+        results_uv_a.append({
+            'T': T,
+            'recall_accuracy': success_rate,
+            'N_v': params['N_v'],
+            'N_h': params['N_h']
+        })
+        print(f"  成功率: {success_rate*100:.1f}% ({success_count}/{num_trials})")
+    
+    # 绘制Figure 5(a)
+    plot_figure5(results_v_only_a, results_uv_a, 
+                param_name='T',
+                param_values=T_values,
+                save_path=os.path.join(fig5_dir, "figure5a.png"),
+                show_plot=show_images)
+
     # ============================================================
     # Figure 5(b): 扫描隐藏层神经元数量N_h
     # ============================================================
@@ -455,7 +453,7 @@ if __name__ == "__main__":
     results_test = run_figure5_experiments_parallel(
         num_trials=100,       # 快速测试用
         noise_num=10,
-        num_epochs=300,
+        num_epochs=500,
         T_values=T_values,
         N_h_values=N_h_values,
         output_dir="./figure5_results",
