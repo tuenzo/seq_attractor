@@ -226,9 +226,9 @@ class SequenceAttractorNetwork:
         }
     
     def test_robustness(self, noise_levels: np.ndarray, 
-                       num_trials: int = 50, verbose: bool = True) -> np.ndarray:
+                   num_trials: int = 100, verbose: bool = True) -> np.ndarray:
         """
-        测试噪声鲁棒性
+        测试噪声鲁棒性（符合论文标准）
         
         参数:
             noise_levels: 噪声水平数组
@@ -241,40 +241,43 @@ class SequenceAttractorNetwork:
         assert self.training_sequence is not None, "请先训练网络"
         
         robustness_scores = np.zeros(len(noise_levels))
-        stability_threshold = 3
+        max_search_steps = self.T * 5  # 最大搜索窗口
         
         for i, noise_level in enumerate(noise_levels):
             success_count = 0
             
             for trial in range(num_trials):
+                # 1. 生成加噪初始状态
                 xi_noisy = self.training_sequence[0, :].copy().reshape(-1, 1)
-                noise_mask = np.random.rand(self.N_v, 1) < noise_level
-                xi_noisy[noise_mask] = -xi_noisy[noise_mask]
+                num_flips = int(noise_level * self.N_v)  # 或使用概率
+                flip_indices = np.random.choice(self.N_v, num_flips, replace=False)
+                xi_noisy[flip_indices] = -xi_noisy[flip_indices]
                 
-                stable_steps = 0
-                converged = False
-                
-                for step in range(self.T * 5):
-                    xi_prev = xi_noisy.copy()
-                    
+                # 2. 记录演化轨迹
+                trajectory = [xi_noisy.flatten().copy()]
+                for step in range(max_search_steps):
                     zeta = np.sign(self.U @ xi_noisy)
                     zeta[zeta == 0] = 1
                     xi_noisy = np.sign(self.V @ zeta)
                     xi_noisy[xi_noisy == 0] = 1
+                    trajectory.append(xi_noisy.flatten().copy())
+                
+                # 3. 检查是否存在τ使得完整序列匹配
+                found_sequence = False
+                for tau in range(len(trajectory) - self.T):
+                    match = True
+                    for t in range(self.T):
+                        expected = self.training_sequence[t, :]
+                        actual = trajectory[tau + t]
+                        if not np.array_equal(actual, expected):
+                            match = False
+                            break
                     
-                    if np.all(xi_noisy.flatten() == self.training_sequence[0, :]):
-                        converged = True
-                        break
-                    
-                    if np.array_equal(xi_noisy, xi_prev):
-                        stable_steps += 1
-                    else:
-                        stable_steps = 0
-                    
-                    if stable_steps >= stability_threshold:
+                    if match:
+                        found_sequence = True
                         break
                 
-                if converged:
+                if found_sequence:
                     success_count += 1
             
             robustness_scores[i] = success_count / num_trials
@@ -283,7 +286,6 @@ class SequenceAttractorNetwork:
                 print(f'噪声水平 {noise_level:.2f}: 成功率 {robustness_scores[i]*100:.1f}%')
         
         return robustness_scores
-
 
 def visualize_results(network: SequenceAttractorNetwork, 
                      xi_replayed: np.ndarray,
@@ -430,37 +432,6 @@ def visualize_robustness(noise_levels: np.ndarray,
     if show_images:
         plt.show()
 
-def visualize_robustness_2(noise_levels: np.ndarray, 
-                        robustness_scores: np.ndarray,
-                        save_path: Optional[str] = None,
-                        title_suffix: str = "",
-                        show_images: bool = False):
-    """
-    可视化噪声鲁棒性测试结果
-    
-    参数:
-        noise_levels: 噪声水平数组
-        robustness_scores: 成功率数组
-        save_path: 保存路径
-        title_suffix: 标题后缀
-    """
-    plt.figure(figsize=(10, 6))
-    plt.plot(noise_levels * 100, robustness_scores * 100, '-o',
-             linewidth=2.5, markersize=8, color='#A23B72')
-    plt.xlabel('噪声水平 (%)', fontsize=12)
-    plt.ylabel('恢复到原序列的成功率 (%)', fontsize=12)
-    
-    title = f'序列吸引子的噪声鲁棒性{title_suffix}'
-    plt.title(title, fontsize=14, fontweight='bold')
-    plt.grid(True, alpha=0.3)
-    plt.ylim([0, 105])
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        print(f"图片已保存: {save_path}")
-    if show_images:
-        plt.show()
 
 
 def parameter_sweep(param_name: str, 
@@ -468,6 +439,7 @@ def parameter_sweep(param_name: str,
                    base_params: Dict,
                    output_dir: str = "./param_sweep_results",
                    test_robustness: bool = True,
+                   noise_levels: Optional[np.ndarray] = None,   
                    custom_sequence: Optional[np.ndarray] = None,
                    V_only: bool = False,
                    show_images: bool = False) -> List[Dict]:
@@ -545,21 +517,42 @@ def parameter_sweep(param_name: str,
         max_noise_tolerance = 0.0
         if test_robustness:
             print("\n进行噪声鲁棒性测试...")
-            noise_levels = np.arange(0, 0.8, 0.05)
-            robustness_scores = network.test_robustness(noise_levels, 
-                                                        num_trials=50, 
-                                                        verbose=False)
-            
-            # 找到最大噪声容忍度
-            tolerance_idx = np.where(robustness_scores > 0.5)[0]
-            if len(tolerance_idx) > 0:
-                max_noise_tolerance = noise_levels[tolerance_idx[-1]]
-            
-            robustness_path = os.path.join(sweep_dir, f"{filename_base}_robustness.png")
-            visualize_robustness(noise_levels, robustness_scores, 
-                               save_path=robustness_path, 
-                               title_suffix=title_suffix,
-                               show_images=show_images)
+            if noise_levels is None:
+                # 默认模式下扫描噪声水平
+                noise_levels = np.arange(0, 0.8, 0.05)
+                robustness_scores = network.test_robustness(noise_levels, 
+                                                            num_trials=50, 
+                                                            verbose=False)
+                
+                # 找到最大噪声容忍度
+                tolerance_idx = np.where(robustness_scores > 0.5)[0]
+                if len(tolerance_idx) > 0:
+                    max_noise_tolerance = noise_levels[tolerance_idx[-1]]
+                
+                robustness_path = os.path.join(sweep_dir, f"{filename_base}_robustness.png")
+                visualize_robustness(noise_levels, robustness_scores, 
+                                save_path=robustness_path, 
+                                title_suffix=title_suffix,
+                                show_images=show_images)
+            elif noise_levels is not None:
+                # 使用自定义噪声水平得到鲁棒性分数
+                robustness_scores = network.test_robustness(noise_levels, 
+                                                            num_trials=50, 
+                                                            verbose=False)
+                # 找到最大噪声容忍度
+                tolerance_idx = np.where(robustness_scores > 0.5)[0]
+                if len(tolerance_idx) > 0:
+                    max_noise_tolerance = noise_levels[tolerance_idx[-1]]
+                if  len(noise_levels) == 1:
+                    # 仅一个噪声水平，直接打印结果
+                    print(f"噪声水平: {noise_levels[0]}, 鲁棒性分数: {robustness_scores[0]:.4f}")
+                else:
+                    robustness_path = os.path.join(sweep_dir, f"{filename_base}_robustness.png")
+                    visualize_robustness(noise_levels, robustness_scores, 
+                                    save_path=robustness_path, 
+                                    title_suffix=title_suffix,
+                                    show_images=show_images)
+                
         
         # 记录结果
         result_entry = {
