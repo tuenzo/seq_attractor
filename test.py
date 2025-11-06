@@ -1,4 +1,4 @@
-from  SAN_tensor_1 import SequenceAttractorNetwork, parameter_sweep, visualize_results, visualize_robustness
+from  SAN_multi_seq_1 import SequenceAttractorNetwork, parameter_sweep, visualize_results, visualize_robustness
 import numpy as np
 # 快速训练
 network = SequenceAttractorNetwork(N_v=100, T=70, N_h=1000, eta=0.001, kappa=1)
