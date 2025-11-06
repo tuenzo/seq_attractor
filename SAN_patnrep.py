@@ -187,142 +187,6 @@ class PatternRepeatingSequenceNetwork(MultiSequenceAttractorNetwork):
             seeds=seeds,
             T=T
         )
-    
-    # ========== 修正后的评估方法 ==========
-    
-    def evaluate_replay(self, xi_replayed: Optional[np.ndarray] = None,
-                    sequence_index: Optional[int] = None,
-                    num_trials: int = 50,
-                    noise_level: float = 0.0,
-                    verbose: bool = False,
-                    include_frame_matching: bool = True) -> Dict:
-        """
-        评估回放质量（修正版 - 完整序列匹配 + 逐帧匹配可视化）
-        
-        参数:
-            xi_replayed: 回放序列（如果为None，则进行多次试验）
-            sequence_index: 与哪个训练序列比较
-            num_trials: 多次试验的次数
-            noise_level: 噪声水平
-            verbose: 是否打印详细信息
-            include_frame_matching: 是否包含逐帧匹配信息（用于可视化）
-            
-        返回:
-            评估指标字典
-        """
-        if len(self.training_sequences) == 0:
-            raise AssertionError("请先训练网络")
-        
-        # 多次试验模式（推荐）
-        if xi_replayed is None:
-            if sequence_index is not None:
-                return self._test_sequence_recall_success_rate(
-                    sequence_index=sequence_index,
-                    num_trials=num_trials,
-                    noise_level=noise_level,
-                    verbose=verbose
-                )
-            else:
-                # 测试所有序列
-                results = {}
-                for k in range(len(self.training_sequences)):
-                    if verbose:
-                        print(f"\n测试序列 #{k}:")
-                    results[f'sequence_{k}'] = self._test_sequence_recall_success_rate(
-                        sequence_index=k,
-                        num_trials=num_trials,
-                        noise_level=noise_level,
-                        verbose=verbose
-                    )
-                return results
-        
-        # 单次评估模式（检查完整序列匹配 + 逐帧匹配）
-        if sequence_index is not None:
-            return self._evaluate_single_replay_with_frames(
-                xi_replayed,
-                self.training_sequences[sequence_index],
-                sequence_index=sequence_index,
-                include_frame_matching=include_frame_matching
-            )
-        else:
-            # 与所有序列比较
-            results = []
-            for k, target_seq in enumerate(self.training_sequences):
-                result = self._evaluate_single_replay_with_frames(
-                    xi_replayed,
-                    target_seq,
-                    sequence_index=k,
-                    include_frame_matching=include_frame_matching
-                )
-                results.append(result)
-            
-            best_idx = np.argmax([r['found_sequence'] for r in results])
-            
-            return {
-                'best_match': results[best_idx],
-                'all_matches': results,
-                'best_sequence_index': best_idx
-            }
-
-    def _evaluate_single_replay_with_frames(self, xi_replayed: np.ndarray,
-                                        target_sequence: np.ndarray,
-                                        sequence_index: Optional[int] = None,
-                                        include_frame_matching: bool = True) -> Dict:
-        """
-        评估单次回放（完整序列匹配 + 逐帧匹配信息）
-        
-        参数:
-            xi_replayed: 回放序列
-            target_sequence: 目标训练序列
-            sequence_index: 序列索引（可选）
-            include_frame_matching: 是否包含逐帧匹配信息
-            
-        返回:
-            评估结果字典
-        """
-        max_steps = xi_replayed.shape[0]
-        T = len(target_sequence)
-        
-        # 1. 检查是否包含完整的训练序列（主要评估）
-        found_sequence = False
-        match_start_idx = -1
-        
-        for tau in range(max_steps - T + 1):
-            segment = xi_replayed[tau:tau+T, :]
-            if np.array_equal(segment, target_sequence):
-                found_sequence = True
-                match_start_idx = tau
-                break
-        
-        result = {
-            'found_sequence': found_sequence,
-            'recall_accuracy': 1.0 if found_sequence else 0.0,
-            'match_start_idx': match_start_idx,
-            'evaluation_mode': 'full_sequence_matching'
-        }
-        
-        # 2. 逐帧匹配信息（用于可视化）
-        if include_frame_matching:
-            match_indices = np.zeros(max_steps, dtype=int)
-            frame_match_count = 0
-            
-            for step in range(max_steps):
-                for t in range(T):
-                    if np.all(xi_replayed[step, :] == target_sequence[t, :]):
-                        match_indices[step] = t + 1  # 1-indexed
-                        frame_match_count += 1
-                        break
-            
-            frame_recall_accuracy = frame_match_count / max_steps
-            
-            result['match_indices'] = match_indices
-            result['frame_match_count'] = frame_match_count
-            result['frame_recall_accuracy'] = frame_recall_accuracy
-        
-        if sequence_index is not None:
-            result['sequence_index'] = sequence_index
-        
-        return result
 
     def _test_sequence_recall_success_rate(self, sequence_index: int,
                                           num_trials: int = 50,
@@ -548,9 +412,9 @@ if __name__ == "__main__":
     
     print(f"生成了 {len(sequences1)} 个序列")
     print(network1.get_pattern_overlap_report())
-    
-    network1.train(x=sequences1, num_epochs=300, verbose=True)
-    
+
+    network1.train(x=sequences1, num_epochs=300, verbose=True, V_only=False, interleaved=True)
+
     network1.visualize_pattern_info(
         save_path="pattern_examples/example1_default_pattern.png",
         show_images=False
@@ -566,6 +430,10 @@ if __name__ == "__main__":
             noise_level=0.0,
             verbose=True
         )
+    visualize_multi_sequence_results(network1, 
+                                    save_path='pattern_examples/mutitest1_all_sequences.png',
+                                    title_suffix="\n(修正评估方法)",
+                                    show_images=False)
     
     # 方式2: 单次回放可视化
     print("\n=== 方式2: 单次回放可视化 ===")
@@ -579,7 +447,7 @@ if __name__ == "__main__":
                          show_images=False)
     
     visualize_multi_sequence_results(network1, 
-                                     save_path='pattern_examples/example1_all_sequences.png',
+                                     save_path='pattern_examples/sigletestsum_all_sequences.png',
                                      title_suffix="\n(修正评估方法)",
                                      show_images=False)
     

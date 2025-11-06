@@ -72,6 +72,7 @@ class MultiSequenceAttractorNetwork(SequenceAttractorNetwork):
               V_only: bool = False,
               interleaved: bool = True) -> Dict:
         """训练网络（重写方法，支持单序列和多序列）"""
+
         if x is None or isinstance(x, np.ndarray):
             result = super().train(x, num_epochs, verbose, seed, V_only)
             if self.training_sequence is not None:
@@ -79,15 +80,15 @@ class MultiSequenceAttractorNetwork(SequenceAttractorNetwork):
                 self.num_sequences = 1
             return result
         elif isinstance(x, list):
-            return self._train_multiple_sequences(x, num_epochs, verbose, V_only, interleaved)
+            return self._train_multiple_sequences(x, num_epochs, V_only, verbose, interleaved)
         else:
             raise ValueError("x 必须是 None、np.ndarray 或 List[np.ndarray]")
     
     def _train_multiple_sequences(self, sequences: List[np.ndarray], 
-                                  num_epochs: int = 500, 
-                                  V_only: bool = False,
-                                  verbose: bool = True,
-                                  interleaved: bool = True) -> Dict:
+                                  num_epochs: int, 
+                                  V_only: bool,
+                                  verbose: bool,
+                                  interleaved: bool) -> Dict:
         """多序列训练的内部实现（新方法）"""
         for i, seq in enumerate(sequences):
             assert seq.shape[1] == self.N_v, \
@@ -175,6 +176,7 @@ class MultiSequenceAttractorNetwork(SequenceAttractorNetwork):
     def _train_batch(self, sequences: List[np.ndarray], 
                     num_epochs: int, V_only: bool, verbose: bool):
         """批量训练策略"""
+        print("V_only:", V_only)
         all_x_current = []
         all_x_next = []
         
@@ -444,6 +446,77 @@ class MultiSequenceAttractorNetwork(SequenceAttractorNetwork):
             'evaluation_mode': 'multiple_trials'
         }
     
+    def _test_sequence_recall_success_rate(self, sequence_index: int,  
+                                          num_trials: int = 50,  
+                                          noise_level: float = 0.0,  
+                                          verbose: bool = False) -> Dict:  
+        """  
+        测试单个序列的回放成功率（类似 test_robustness 的评估方式）  
+        """  
+        assert sequence_index < len(self.training_sequences), \
+            f"序列索引 {sequence_index} 超出范围"  
+        
+        target_sequence = self.training_sequences[sequence_index]  
+        T = len(target_sequence)  
+        max_search_steps = T * 5  
+        
+        success_count = 0  
+        convergence_steps = []  
+        trajectory = np.zeros((max_search_steps + 1, self.N_v))  
+        
+        for trial in range(num_trials):  
+            # 1. 生成初始状态  
+            xi_test = target_sequence[0, :].copy().reshape(-1, 1)  
+            
+            if noise_level > 0:  
+                num_flips = int(noise_level * self.N_v)  
+                if num_flips > 0:  
+                    flip_indices = np.random.choice(self.N_v, num_flips, replace=False)  
+                    xi_test[flip_indices] = -xi_test[flip_indices]  
+            
+            # 2. 记录演化轨迹  
+            trajectory[0, :] = xi_test.flatten()  
+            
+            for step in range(max_search_steps):  
+                zeta = np.sign(self.U @ xi_test)  
+                zeta[zeta == 0] = 1  
+                xi_test = np.sign(self.V @ zeta)  
+                xi_test[xi_test == 0] = 1  
+                trajectory[step + 1, :] = xi_test.flatten()  
+            
+            # 3. 检查是否成功回放完整序列  
+            found_sequence = False  
+            for tau in range(max_search_steps - T + 2):  
+                segment = trajectory[tau:tau+T, :]  
+                if np.array_equal(segment, target_sequence):  
+                    found_sequence = True  
+                    convergence_steps.append(tau)  
+                    break  
+            
+            if found_sequence:  
+                success_count += 1  
+        
+        success_rate = success_count / num_trials  
+        
+        if verbose:  
+            print(f'序列 #{sequence_index}, 噪声水平 {noise_level:.2f}: '  
+                  f'成功率 {success_rate*100:.1f}% ({success_count}/{num_trials} 次成功)')  
+            if convergence_steps:  
+                print(f'  平均收敛步数: {np.mean(convergence_steps):.1f}')  
+                print(f'  收敛步数范围: [{np.min(convergence_steps)}, {np.max(convergence_steps)}]')  
+        
+        return {  
+            'success_rate': success_rate,  
+            'recall_accuracy': success_rate,  # 向后兼容  
+            'success_count': success_count,  
+            'num_trials': num_trials,  
+            'noise_level': noise_level,  
+            'sequence_index': sequence_index,  
+            'convergence_steps': convergence_steps if convergence_steps else None,  
+            'avg_convergence_steps': np.mean(convergence_steps) if convergence_steps else None,  
+            'evaluation_mode': 'multiple_trials'  
+        }  
+
     def test_robustness(self, noise_levels: np.ndarray, 
                        num_trials: int = 50, 
                        verbose: bool = True,
@@ -1176,7 +1249,7 @@ def visualize_multi_sequence_robustness(noise_levels: np.ndarray,
 # ========== 使用示例（演示新的评估方式）==========
 if __name__ == "__main__":
     import os
-    os.makedirs("examples_corrected", exist_ok=True)
+    os.makedirs("multi_seq_example_result", exist_ok=True)
     
     print("\n" + "="*70)
     print("演示修正后的评估方法")
@@ -1187,7 +1260,7 @@ if __name__ == "__main__":
     sequences = network.generate_multiple_sequences(num_sequences=3, seeds=[10, 20, 30])
     
     print("\n训练网络...")
-    network.train(x=sequences, num_epochs=400, verbose=True, interleaved=True)
+    network.train(x=sequences, num_epochs=400, verbose=True, interleaved=True, V_only=False)
     
     # 方式1: 正确的评估方式 - 多次试验（推荐）
     print("\n" + "="*70)
@@ -1209,6 +1282,7 @@ if __name__ == "__main__":
         print(f"  成功率: {result['success_rate']*100:.1f}%")
         if result['avg_convergence_steps'] is not None:
             print(f"  平均收敛步数: {result['avg_convergence_steps']:.1f}")
+        
     
     # 方式2: 单次回放评估（使用完整序列匹配）
     print("\n" + "="*70)
@@ -1226,6 +1300,10 @@ if __name__ == "__main__":
         print(f"序列 #{k}: {status}")
         if result['found_sequence']:
             print(f"  匹配起始位置: {result['match_start_idx']}")
+        visualize_results(network, xi_replayed, result, 
+                         save_path=f'multi_seq_example_result/example1_replay_{k}.png',
+                         show_images=False)
+        print(f"\n✓ 已保存: multi_seq_example_result/example1_replay_{k}.png")
     
     # 方式3: 鲁棒性测试（不同噪声水平）
     print("\n" + "="*70)
@@ -1259,10 +1337,10 @@ if __name__ == "__main__":
     plt.grid(True, alpha=0.3)
     plt.ylim([0, 105])
     plt.tight_layout()
-    plt.savefig("examples_corrected/robustness_corrected.png", dpi=150, bbox_inches='tight')
+    plt.savefig("multi_seq_example_result/robustness_corrected.png", dpi=150, bbox_inches='tight')
     plt.close()
     
-    print("\n✓ 已保存: examples_corrected/robustness_corrected.png")
+    print("\n✓ 已保存: multi_seq_example_result/robustness_corrected.png")
     
     # 对比新旧评估方式
     print("\n" + "="*70)

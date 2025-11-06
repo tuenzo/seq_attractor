@@ -716,9 +716,10 @@ if __name__ == "__main__":
     xi_replayed = network.replay()
     replay_time = time.time() - start_time
     
-    eval_results = network.evaluate_replay(xi_replayed)
+    eval_results = network.evaluate_replay(xi_replayed,check_full_sequence=False)
     print(f"  回放时间: {replay_time:.2f} 秒")
     print(f"  回放准确率: {eval_results['recall_accuracy']*100:.2f}%")
+    visualize_results(network, xi_replayed, eval_results, show_images=True)
     
     # 测试鲁棒性速度
     print("\n鲁棒性测试:")
@@ -731,4 +732,5 @@ if __name__ == "__main__":
     print(f"  成功率: {robustness_scores[0]*100:.1f}%")
     
     print(f"\n总计时间: {train_time + replay_time + robustness_time:.2f} 秒")
+    visualize_robustness(noise_levels, robustness_scores, show_images=True)
 
