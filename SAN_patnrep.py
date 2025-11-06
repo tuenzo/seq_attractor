@@ -424,7 +424,7 @@ if __name__ == "__main__":
                                      show_images=False
                                      )
     
-    exit()
+    
     print("\n" + "="*70)
     print("示例2: 自定义配置（序列0,1,2共享2个模式，序列3,4共享1个模式）")
     print("="*70)
@@ -468,6 +468,12 @@ if __name__ == "__main__":
         xi_replayed = network2.replay(sequence_index=k)
         eval_result = network2.evaluate_replay(xi_replayed, sequence_index=k)
         print(f"序列 #{k}: 回放准确率 {eval_result['recall_accuracy']*100:.1f}%")
+        visualize_results(network1, xi_replayed, eval_result, save_path=f'pattern_examples/example1_replay_{k}.png')
+    visualize_multi_sequence_results(network2, 
+                                     save_path='pattern_examples/example2_all_sequences.png',
+                                     title_suffix="\n(五个序列回放结果汇总)",
+                                     show_images=False
+                                     )
     
     
     print("\n" + "="*70)
@@ -518,7 +524,13 @@ if __name__ == "__main__":
         acc = eval_result['recall_accuracy']
         accuracies.append(acc)
         print(f"序列 #{k}: 回放准确率 {acc*100:.1f}%")
-    
+        visualize_results(network3, xi_replayed, eval_result, save_path=f'pattern_examples/example3_replay_{k}.png')
+    visualize_multi_sequence_results(network3, 
+                                     save_path='pattern_examples/example3_all_sequences.png',
+                                     title_suffix="\n(六个序列回放结果汇总)",
+                                     show_images=False
+                                     )
+
     print(f"\n平均回放准确率: {np.mean(accuracies)*100:.1f}%")
     
     print("\n" + "="*70)
