@@ -84,10 +84,10 @@ class MultiSequenceAttractorNetwork(SequenceAttractorNetwork):
             raise ValueError("x 必须是 None、np.ndarray 或 List[np.ndarray]")
     
     def _train_multiple_sequences(self, sequences: List[np.ndarray], 
-                                  num_epochs: int, 
-                                  V_only: bool,
-                                  verbose: bool,
-                                  interleaved: bool) -> Dict:
+                                  num_epochs: int = 500, 
+                                  V_only: bool = False,
+                                  verbose: bool = True,
+                                  interleaved: bool = True) -> Dict:
         """多序列训练的内部实现（新方法）"""
         for i, seq in enumerate(sequences):
             assert seq.shape[1] == self.N_v, \
