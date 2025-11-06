@@ -74,13 +74,13 @@ class MultiSequenceAttractorNetwork(SequenceAttractorNetwork):
         """训练网络（重写方法，支持单序列和多序列）"""
 
         if x is None or isinstance(x, np.ndarray):
-            result = super().train(x, num_epochs, verbose, seed, V_only)
+            result = super().train(x=x, num_epochs=num_epochs, verbose=verbose, seed=seed, V_only=V_only)
             if self.training_sequence is not None:
                 self.training_sequences = [self.training_sequence]
                 self.num_sequences = 1
             return result
         elif isinstance(x, list):
-            return self._train_multiple_sequences(x, num_epochs, V_only, verbose, interleaved)
+            return self._train_multiple_sequences(sequences=x, num_epochs=num_epochs, V_only=V_only, verbose=verbose, interleaved=interleaved)
         else:
             raise ValueError("x 必须是 None、np.ndarray 或 List[np.ndarray]")
     
@@ -111,10 +111,10 @@ class MultiSequenceAttractorNetwork(SequenceAttractorNetwork):
         self.nu_history = np.zeros(num_epochs)
         
         if interleaved:
-            self._train_interleaved(sequences, num_epochs, V_only, verbose)
+            self._train_interleaved(sequences=sequences, num_epochs=num_epochs, V_only=V_only, verbose=verbose)
         else:
-            self._train_batch(sequences, num_epochs, V_only, verbose)
-        
+            self._train_batch(sequences=sequences, num_epochs=num_epochs, V_only=V_only, verbose=verbose)
+
         return {
             'mu_history': self.mu_history,
             'nu_history': self.nu_history,
