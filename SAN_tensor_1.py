@@ -211,43 +211,147 @@ class SequenceAttractorNetwork:
         
         return xi_replayed
     
-    def evaluate_replay(self, xi_replayed: np.ndarray) -> Dict:
+    def evaluate_replay(self, xi_replayed: np.ndarray, 
+                    num_trials: int = 50,
+                    check_full_sequence: bool = True) -> Dict:
         """
-        评估回放质量（优化版本 - 向量化比较）
+        评估回放质量（改进版 - 正确评估完整序列回放）
         
         参数:
-            xi_replayed: 回放序列
+            xi_replayed: 回放序列（如果为None，则进行多次试验）
+            num_trials: 测试次数（用于统计成功率）
+            check_full_sequence: 是否检查完整序列匹配
             
         返回:
             评估指标字典
         """
         assert self.training_sequence is not None, "请先训练网络"
         
-        max_steps = xi_replayed.shape[0]
+        if xi_replayed is not None:
+            # 单次评估模式（向后兼容）
+            max_steps = xi_replayed.shape[0]
+            
+            # 检查是否包含完整的训练序列
+            found_sequence = False
+            match_start_idx = -1
+            
+            if check_full_sequence:
+                for tau in range(max_steps - self.T + 1):
+                    segment = xi_replayed[tau:tau+self.T, :]
+                    if np.array_equal(segment, self.training_sequence):
+                        found_sequence = True
+                        match_start_idx = tau
+                        break
+                
+                recall_accuracy = 1.0 if found_sequence else 0.0
+            else:
+                # 旧的逐帧匹配方式（保留用于兼容）
+                match_indices = np.zeros(max_steps, dtype=int)
+                for step in range(max_steps):
+                    matches = np.all(xi_replayed[step, :] == self.training_sequence, axis=1)
+                    if np.any(matches):
+                        match_indices[step] = np.where(matches)[0][0] + 1
+                
+                match_count = np.sum(match_indices > 0)
+                recall_accuracy = match_count / max_steps
+                
+                return {
+                    'recall_accuracy': recall_accuracy,
+                    'match_count': match_count,
+                    'match_indices': match_indices,
+                    'evaluation_mode': 'frame_matching'
+                }
+            
+            return {
+                'recall_accuracy': recall_accuracy,
+                'found_sequence': found_sequence,
+                'match_start_idx': match_start_idx,
+                'evaluation_mode': 'full_sequence'
+            }
         
-        # 向量化匹配检查
-        # 使用广播和矩阵运算加速
-        match_indices = np.zeros(max_steps, dtype=int)
+        else:
+            # 多次试验模式（类似 test_robustness，但无噪声）
+            return self.test_recall_success_rate(num_trials=num_trials)
+
+
+    def test_recall_success_rate(self, num_trials: int = 50, 
+                                noise_level: float = 0.0,
+                                verbose: bool = True) -> Dict:
+        """
+        测试无噪声或低噪声下的序列回放成功率
         
-        for step in range(max_steps):
-            # 将当前状态与所有训练状态比较
-            matches = np.all(xi_replayed[step, :] == self.training_sequence, axis=1)
-            if np.any(matches):
-                match_indices[step] = np.where(matches)[0][0] + 1
+        参数:
+            num_trials: 测试次数
+            noise_level: 噪声水平（默认0.0表示无噪声）
+            verbose: 是否打印信息
+            
+        返回:
+            包含成功率和详细统计的字典
+        """
+        assert self.training_sequence is not None, "请先训练网络"
         
-        match_count = np.sum(match_indices > 0)
-        recall_accuracy = match_count / max_steps
+        success_count = 0
+        max_search_steps = self.T * 5
+        trajectory = np.zeros((max_search_steps + 1, self.N_v))
+        
+        convergence_steps = []  # 记录收敛所需步数
+        
+        for trial in range(num_trials):
+            # 1. 生成初始状态（加噪或无噪）
+            xi_test = self.training_sequence[0, :].copy().reshape(-1, 1)
+            
+            if noise_level > 0:
+                num_flips = int(noise_level * self.N_v)
+                if num_flips > 0:
+                    flip_indices = np.random.choice(self.N_v, num_flips, replace=False)
+                    xi_test[flip_indices] = -xi_test[flip_indices]
+            
+            # 2. 记录演化轨迹
+            trajectory[0, :] = xi_test.flatten()
+            
+            for step in range(max_search_steps):
+                zeta = np.sign(self.U @ xi_test)
+                zeta[zeta == 0] = 1
+                xi_test = np.sign(self.V @ zeta)
+                xi_test[xi_test == 0] = 1
+                trajectory[step + 1, :] = xi_test.flatten()
+            
+            # 3. 检查是否成功回放完整序列
+            found_sequence = False
+            for tau in range(max_search_steps - self.T + 2):
+                segment = trajectory[tau:tau+self.T, :]
+                if np.array_equal(segment, self.training_sequence):
+                    found_sequence = True
+                    convergence_steps.append(tau)
+                    break
+            
+            if found_sequence:
+                success_count += 1
+        
+        success_rate = success_count / num_trials
+        
+        if verbose:
+            print(f'噪声水平 {noise_level:.2f}: 成功率 {success_rate*100:.1f}% '
+                f'({success_count}/{num_trials} 次成功)')
+            if convergence_steps:
+                print(f'  平均收敛步数: {np.mean(convergence_steps):.1f}')
+                print(f'  收敛步数范围: [{np.min(convergence_steps)}, {np.max(convergence_steps)}]')
         
         return {
-            'recall_accuracy': recall_accuracy,
-            'match_count': match_count,
-            'match_indices': match_indices
+            'success_rate': success_rate,
+            'success_count': success_count,
+            'num_trials': num_trials,
+            'noise_level': noise_level,
+            'convergence_steps': convergence_steps if convergence_steps else None,
+            'avg_convergence_steps': np.mean(convergence_steps) if convergence_steps else None
         }
-    
+
+
     def test_robustness(self, noise_levels: np.ndarray, 
-                       num_trials: int = 50, verbose: bool = True) -> np.ndarray:
+                    num_trials: int = 50, 
+                    verbose: bool = True) -> np.ndarray:
         """
-        测试噪声鲁棒性（优化版本 - 预分配内存）
+        测试噪声鲁棒性（使用新的评估方法）
         
         参数:
             noise_levels: 噪声水平数组
@@ -257,50 +361,15 @@ class SequenceAttractorNetwork:
         返回:
             成功率数组
         """
-        assert self.training_sequence is not None, "请先训练网络"
-        
         robustness_scores = np.zeros(len(noise_levels))
-        max_search_steps = self.T * 5
-        
-        # 预分配轨迹数组（复用）
-        trajectory = np.zeros((max_search_steps + 1, self.N_v))
         
         for i, noise_level in enumerate(noise_levels):
-            success_count = 0
-            
-            for trial in range(num_trials):
-                # 1. 生成加噪初始状态
-                xi_noisy = self.training_sequence[0, :].copy().reshape(-1, 1)
-                num_flips = int(noise_level * self.N_v)
-                flip_indices = np.random.choice(self.N_v, num_flips, replace=False)
-                xi_noisy[flip_indices] = -xi_noisy[flip_indices]
-                
-                # 2. 记录演化轨迹（使用预分配数组）
-                trajectory[0, :] = xi_noisy.flatten()
-                
-                for step in range(max_search_steps):
-                    zeta = np.sign(self.U @ xi_noisy)
-                    zeta[zeta == 0] = 1
-                    xi_noisy = np.sign(self.V @ zeta)
-                    xi_noisy[xi_noisy == 0] = 1
-                    trajectory[step + 1, :] = xi_noisy.flatten()
-                
-                # 3. 向量化检查序列匹配
-                found_sequence = False
-                for tau in range(max_search_steps - self.T + 2):
-                    # 批量比较T个连续状态
-                    segment = trajectory[tau:tau+self.T, :]
-                    if np.array_equal(segment, self.training_sequence):
-                        found_sequence = True
-                        break
-                
-                if found_sequence:
-                    success_count += 1
-            
-            robustness_scores[i] = success_count / num_trials
-            
-            if verbose:
-                print(f'噪声水平 {noise_level:.2f}: 成功率 {robustness_scores[i]*100:.1f}%')
+            result = self.test_recall_success_rate(
+                num_trials=num_trials,
+                noise_level=noise_level,
+                verbose=verbose
+            )
+            robustness_scores[i] = result['success_rate']
         
         return robustness_scores
 
