@@ -54,16 +54,196 @@ class MultiSequenceAttractorNetwork(SequenceAttractorNetwork):
     
     def generate_multiple_sequences(self, num_sequences: int, 
                                     seeds: Optional[List[int]] = None,
-                                    T: Optional[int] = None) -> List[np.ndarray]:
-        """生成多个随机序列（新方法）"""
+                                    T: Optional[int] = None,
+                                    ensure_unique_across_sequences: bool = True,
+                                    max_attempts: int = 1000) -> List[np.ndarray]:
+        """
+        生成多个随机序列（新方法，支持跨序列唯一性检查）
+        
+        参数:
+            num_sequences: 序列数量
+            seeds: 随机种子列表（可选）
+            T: 序列长度（可选，默认使用self.T）
+            ensure_unique_across_sequences: 是否确保不同序列之间也不重叠（默认True）
+            max_attempts: 生成唯一帧的最大尝试次数
+            
+        返回:
+            序列列表
+        """
         sequences = []
         if seeds is None:
             seeds = list(range(num_sequences))
+        
         seq_length = T if T is not None else self.T
-        for i, seed in enumerate(seeds[:num_sequences]):
-            seq = self.generate_random_sequence_with_length(T=seq_length, seed=seed)
+        
+        if not ensure_unique_across_sequences:
+            # 原有逻辑：不检查跨序列重叠
+            for i, seed in enumerate(seeds[:num_sequences]):
+                seq = self.generate_random_sequence_with_length(T=seq_length, seed=seed)
+                sequences.append(seq)
+            return sequences
+        
+        # 新逻辑：确保跨序列唯一性
+        print(f"生成 {num_sequences} 个序列，确保跨序列唯一性...")
+        
+        # 存储所有已使用的帧（用于跨序列检查）
+        all_used_frames = []
+        
+        for seq_idx, seed in enumerate(seeds[:num_sequences]):
+            if seed is not None:
+                np.random.seed(seed)
+            
+            print(f"  正在生成序列 #{seq_idx+1}...", end=" ")
+            
+            # 初始化序列
+            seq = np.zeros((seq_length, self.N_v))
+            
+            # 生成每一帧
+            for t in range(seq_length - 1):  # 最后一帧单独处理
+                attempts = 0
+                while attempts < max_attempts:
+                    # 生成候选帧
+                    candidate_frame = np.sign(np.random.randn(self.N_v))
+                    candidate_frame[candidate_frame == 0] = 1
+                    
+                    # 检查与当前序列内部的重叠
+                    is_unique_within = True
+                    for prev_t in range(t):
+                        if np.array_equal(candidate_frame, seq[prev_t, :]):
+                            is_unique_within = False
+                            break
+                    
+                    if not is_unique_within:
+                        attempts += 1
+                        continue
+                    
+                    # 检查与所有其他序列的重叠
+                    is_unique_across = True
+                    for used_frame in all_used_frames:
+                        if np.array_equal(candidate_frame, used_frame):
+                            is_unique_across = False
+                            break
+                    
+                    if is_unique_across:
+                        # 找到唯一帧
+                        seq[t, :] = candidate_frame
+                        all_used_frames.append(candidate_frame.copy())
+                        break
+                    
+                    attempts += 1
+                
+                if attempts >= max_attempts:
+                    print(f"\n警告: 序列 #{seq_idx+1} 位置 {t} 无法生成唯一帧（尝试{max_attempts}次）")
+                    # 使用当前候选帧（可能重复）
+                    seq[t, :] = candidate_frame
+            
+            # 处理最后一帧（周期性：与第一帧相同）
+            seq[seq_length - 1, :] = seq[0, :]
+            
             sequences.append(seq)
+            print("完成")
+        
+        print("所有序列生成完毕\n")
         return sequences
+
+    def analyze_sequence_overlap(self, sequences: List[np.ndarray]) -> Dict:
+        """
+        分析多个序列之间的重叠情况
+        
+        参数:
+            sequences: 序列列表
+            
+        返回:
+            重叠分析结果字典
+        """
+        num_sequences = len(sequences)
+        if num_sequences == 0:
+            return {"error": "没有序列"}
+        
+        seq_length = sequences[0].shape[0]
+        
+        overlap_info = {
+            'total_frames': num_sequences * (seq_length - 1),  # 不计算周期性的最后一帧
+            'unique_frames': 0,
+            'duplicate_frames': 0,
+            'overlap_details': []
+        }
+        
+        # 收集所有帧
+        all_frames = []
+        frame_sources = []  # 记录每个帧来自哪个序列的哪个位置
+        
+        for seq_idx, seq in enumerate(sequences):
+            for t in range(seq_length - 1):  # 不包括最后一帧（周期性）
+                frame = seq[t, :]
+                all_frames.append(frame)
+                frame_sources.append((seq_idx, t))
+        
+        # 检查重复
+        checked_indices = set()
+        
+        for i in range(len(all_frames)):
+            if i in checked_indices:
+                continue
+            
+            # 找到所有与当前帧相同的帧
+            duplicates = []
+            for j in range(i + 1, len(all_frames)):
+                if np.array_equal(all_frames[i], all_frames[j]):
+                    duplicates.append(j)
+                    checked_indices.add(j)
+            
+            if duplicates:
+                # 发现重复
+                overlap_info['duplicate_frames'] += 1 + len(duplicates)
+                
+                # 记录详细信息
+                detail = {
+                    'frame_index': i,
+                    'source': frame_sources[i],
+                    'duplicates': [frame_sources[j] for j in duplicates]
+                }
+                overlap_info['overlap_details'].append(detail)
+            else:
+                overlap_info['unique_frames'] += 1
+        
+        overlap_info['overlap_rate'] = overlap_info['duplicate_frames'] / overlap_info['total_frames']
+        
+        return overlap_info
+
+    def print_overlap_analysis(self, sequences: List[np.ndarray]):
+        """
+        打印序列重叠分析报告
+        
+        参数:
+            sequences: 序列列表
+        """
+        analysis = self.analyze_sequence_overlap(sequences)
+        
+        print("\n" + "="*60)
+        print("序列重叠分析报告")
+        print("="*60)
+        print(f"序列数量: {len(sequences)}")
+        print(f"总帧数: {analysis['total_frames']}")
+        print(f"唯一帧数: {analysis['unique_frames']}")
+        print(f"重复帧数: {analysis['duplicate_frames']}")
+        print(f"重叠率: {analysis['overlap_rate']*100:.2f}%")
+        
+        if analysis['overlap_details']:
+            print("\n重叠详情:")
+            for i, detail in enumerate(analysis['overlap_details'][:10]):  # 最多显示10个
+                seq_idx, pos = detail['source']
+                print(f"  [{i+1}] 序列 #{seq_idx} 位置 {pos} 与以下位置重叠:")
+                for dup_seq_idx, dup_pos in detail['duplicates']:
+                    print(f"      - 序列 #{dup_seq_idx} 位置 {dup_pos}")
+            
+            if len(analysis['overlap_details']) > 10:
+                print(f"  ... 还有 {len(analysis['overlap_details']) - 10} 处重叠未显示")
+        else:
+            print("\n✓ 没有发现重叠")
+        
+        print("="*60 + "\n")
+
     
     def train(self, x: Optional[Union[np.ndarray, List[np.ndarray]]] = None, 
               num_epochs: int = 500, 
@@ -1258,6 +1438,7 @@ if __name__ == "__main__":
     # 创建网络并训练
     network = MultiSequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.01)
     sequences = network.generate_multiple_sequences(num_sequences=3, seeds=[10, 20, 30])
+    network.print_overlap_analysis(sequences)
     
     print("\n训练网络...")
     network.train(x=sequences, num_epochs=400, verbose=True, interleaved=True, V_only=False)
