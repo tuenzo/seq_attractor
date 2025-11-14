@@ -40,7 +40,11 @@ def main() -> None:
     common.add_argument("--Nh-values", type=_parse_int_list, default=(100, 325, 550, 775, 1000),
                         help="Comma-separated list, e.g. 100,325,550,775,1000")
 
-    p_split = sub.add_parser("fig5-split", parents=[common], help="Run split-mode Figure 5 (V-only scan T; UV scan N_h)")
+    p_split = sub.add_parser(
+        "fig5-split",
+        parents=[common],
+        help="Run split-mode Figure 5 (compare V-only vs U+V for both scans)",
+    )
     p_split.add_argument("--with-repetition", action="store_true", help="Inject single-step repetition into the sequence")
     p_split.add_argument("--repeat-pos", type=int, default=None, help="Repetition position (default: middle)")
 

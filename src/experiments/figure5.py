@@ -49,6 +49,7 @@ def plot_figure5(
     *,
     save_path: Optional[Path] = None,
     show_plot: bool = True,
+    title_suffix: str = "",
 ) -> None:
     """Plot the Figure 5 comparison between V-only and U+V training."""
 
@@ -86,6 +87,9 @@ def plot_figure5(
     else:
         plt.xlabel(param_name, fontsize=14)
         title = f"Comparison: {param_name}"
+
+    if title_suffix:
+        title = f"{title}{title_suffix}"
 
     plt.ylabel("Successful Retrievals (%)", fontsize=14, fontweight="bold")
     plt.title(title, fontsize=16, fontweight="bold", pad=20)
@@ -262,7 +266,97 @@ def run_figure5_experiments(
     return results_v_only_a, results_uv_a, results_v_only_b, results_uv_b, output_path
 
 
-# ========= 新增：拆分模式版本（符合“V-only 扫 T；UV 扫 N_h”对比） =========
+# ========= 拆分模式版本：每个子图对比仅训练 V 与训练 U+V =========
+
+
+def _evaluate_single_split_point(
+    params: Dict,
+    *,
+    cfg: Figure5Config,
+    v_only: bool,
+    with_repetition: bool,
+    repetition_position: Optional[int],
+) -> float:
+    success_count = 0
+    for trial in range(cfg.num_trials):
+        net = SequenceAttractorNetwork(**params)
+
+        if with_repetition:
+            x_train = _generate_sequence_with_single_repetition(
+                T=params["T"],
+                N_v=params["N_v"],
+                seed=trial,
+                repeat_pos=repetition_position,
+            )
+            train_seed = None
+        else:
+            x_train = None
+            train_seed = trial
+
+        net.train(
+            x=x_train,
+            num_epochs=cfg.num_epochs,
+            verbose=False,
+            seed=train_seed,
+            V_only=v_only,
+        )
+        noise_level = cfg.noise_level(params["N_v"])
+        robustness = net.test_robustness(
+            noise_levels=np.array([noise_level]),
+            num_trials=1,
+            verbose=False,
+        )
+        if robustness[0] > 0.5:
+            success_count += 1
+    return success_count / cfg.num_trials
+
+
+def _run_split_configuration(
+    base_params: Dict,
+    varying_key: str,
+    varying_values: Sequence[int],
+    *,
+    cfg: Figure5Config,
+    with_repetition: bool,
+    repetition_position: Optional[int],
+) -> Tuple[List[Dict], List[Dict]]:
+    results_v_only: List[Dict] = []
+    results_uv: List[Dict] = []
+
+    for value in varying_values:
+        params = dict(base_params)
+        params[varying_key] = int(value)
+
+        success_v = _evaluate_single_split_point(
+            params,
+            cfg=cfg,
+            v_only=True,
+            with_repetition=with_repetition,
+            repetition_position=repetition_position,
+        )
+        success_uv = _evaluate_single_split_point(
+            params,
+            cfg=cfg,
+            v_only=False,
+            with_repetition=with_repetition,
+            repetition_position=repetition_position,
+        )
+
+        common_metadata = {
+            varying_key: params[varying_key],
+            "recall_accuracy": 0.0,  # placeholder to overwrite below
+            "N_v": params["N_v"],
+            "with_repetition": with_repetition,
+        }
+        if "T" in params:
+            common_metadata["T"] = params["T"]
+        if "N_h" in params:
+            common_metadata["N_h"] = params["N_h"]
+
+        results_v_only.append({**common_metadata, "recall_accuracy": success_v})
+        results_uv.append({**common_metadata, "recall_accuracy": success_uv})
+
+    return results_v_only, results_uv
 
 def _generate_sequence_with_single_repetition(T: int, N_v: int, seed: int, repeat_pos: Optional[int] = None) -> np.ndarray:
     """
@@ -294,13 +388,13 @@ def run_figure5_experiments_split_modes(
     show_images: bool = False,
     with_repetition: bool = False,
     repetition_position: Optional[int] = None,
-) -> Tuple[List[Dict], List[Dict], Path]:
+) -> Tuple[List[Dict], List[Dict], List[Dict], List[Dict], Path]:
     """
     拆分模式对比：
-    - 图(a)：仅训练 V，固定 N_h=500，扫描 T
-    - 图(b)：训练 U+V，固定 T=70，扫描 N_h
-    可选：with_repetition=True 时，在训练序列中引入一个单步重复。
-    返回：(results_v_only_T_scan, results_uv_Nh_scan, output_path)
+    - 图(a)：固定 N_h=500，扫描 T，比较仅训练 V 与训练 U+V
+    - 图(b)：固定 T=70，扫描 N_h，比较仅训练 V 与训练 U+V
+    可选：with_repetition=True 时，在训练序列中引入单步重复。
+    返回：(results_v_only_T_scan, results_uv_T_scan, results_v_only_Nh_scan, results_uv_Nh_scan, output_path)
     """
     cfg = config or Figure5Config()
     output_path = _ensure_output_dir(output_dir, create_timestamp=create_timestamp_dir)
@@ -308,152 +402,79 @@ def run_figure5_experiments_split_modes(
     base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.01, "kappa": 1.0}
     base_params_b = {"N_v": 100, "T": 70, "eta": 0.01, "kappa": 1.0}
 
-    results_v_only_T_scan: List[Dict] = []
-    # 图(a)：V-only 扫描 T
-    for T_value in cfg.T_values:
-        params = {**base_params_a, "T": int(T_value)}
-        success_count = 0
-        for trial in range(cfg.num_trials):
-            net = SequenceAttractorNetwork(**params)
-            if with_repetition:
-                x_train = _generate_sequence_with_single_repetition(
-                    T=params["T"], N_v=params["N_v"], seed=trial, repeat_pos=repetition_position
-                )
-            else:
-                x_train = None
-            net.train(
-                x=x_train,
-                num_epochs=cfg.num_epochs,
-                verbose=False,
-                seed=None if x_train is not None else trial,
-                V_only=True,
-            )
-            noise_level = cfg.noise_level(params["N_v"])
-            robustness = net.test_robustness(
-                noise_levels=np.array([noise_level]),
-                num_trials=1,
-                verbose=False,
-            )
-            if robustness[0] > 0.5:
-                success_count += 1
-        success_rate = success_count / cfg.num_trials
-        results_v_only_T_scan.append(
-            {
-                "T": params["T"],
-                "recall_accuracy": success_rate,
-                "N_v": params["N_v"],
-                "N_h": params["N_h"],
-                "with_repetition": with_repetition,
-            }
-        )
-
-    results_uv_Nh_scan: List[Dict] = []
-    # 图(b)：U+V 扫描 N_h
-    for N_h_value in cfg.N_h_values:
-        params = {**base_params_b, "N_h": int(N_h_value)}
-        success_count = 0
-        for trial in range(cfg.num_trials):
-            net = SequenceAttractorNetwork(**params)
-            if with_repetition:
-                x_train = _generate_sequence_with_single_repetition(
-                    T=params["T"], N_v=params["N_v"], seed=trial, repeat_pos=repetition_position
-                )
-            else:
-                x_train = None
-            net.train(
-                x=x_train,
-                num_epochs=cfg.num_epochs,
-                verbose=False,
-                seed=None if x_train is not None else trial,
-                V_only=False,
-            )
-            noise_level = cfg.noise_level(params["N_v"])
-            robustness = net.test_robustness(
-                noise_levels=np.array([noise_level]),
-                num_trials=1,
-                verbose=False,
-            )
-            if robustness[0] > 0.5:
-                success_count += 1
-        success_rate = success_count / cfg.num_trials
-        results_uv_Nh_scan.append(
-            {
-                "N_h": params["N_h"],
-                "recall_accuracy": success_rate,
-                "N_v": params["N_v"],
-                "T": params["T"],
-                "with_repetition": with_repetition,
-            }
-        )
-
-    # 绘制两张图：分别只有一条曲线
-    plt.figure(figsize=(8, 6))
-    plt.plot(
-        list(cfg.T_values),
-        np.array([r["recall_accuracy"] for r in results_v_only_T_scan]) * 100.0,
-        "o-",
-        linewidth=2,
-        markersize=8,
-        label="V-only (scan T)",
-        color="#E74C3C",
+    results_v_only_T_scan, results_uv_T_scan = _run_split_configuration(
+        base_params_a,
+        "T",
+        cfg.T_values,
+        cfg=cfg,
+        with_repetition=with_repetition,
+        repetition_position=repetition_position,
     )
-    plt.xlabel("Sequence Length (T)", fontsize=14, fontweight="bold")
-    plt.ylabel("Successful Retrievals (%)", fontsize=14, fontweight="bold")
-    title_suffix = " with single-step repetition" if with_repetition else ""
-    plt.title(f"(a) Fixed N=100, M=500{title_suffix}", fontsize=16, fontweight="bold", pad=20)
-    plt.grid(True, alpha=0.3, linestyle="--")
-    plt.ylim([-5, 105])
-    plt.yticks(np.arange(0, 101, 20))
-    plt.tight_layout()
-    plt.savefig(output_path / ("figure5a_split.png" if not with_repetition else "figure5a_split_repetition.png"),
-                dpi=300, bbox_inches="tight")
-    if show_images:
-        plt.show()
-    else:
-        plt.close()
 
-    plt.figure(figsize=(8, 6))
-    plt.plot(
-        list(cfg.N_h_values),
-        np.array([r["recall_accuracy"] for r in results_uv_Nh_scan]) * 100.0,
-        "s-",
-        linewidth=2,
-        markersize=8,
-        label="U+V (scan N_h)",
-        color="#3498DB",
+    results_v_only_Nh_scan, results_uv_Nh_scan = _run_split_configuration(
+        base_params_b,
+        "N_h",
+        cfg.N_h_values,
+        cfg=cfg,
+        with_repetition=with_repetition,
+        repetition_position=repetition_position,
     )
-    plt.xlabel("Number of Hidden Neurons (M)", fontsize=14, fontweight="bold")
-    plt.ylabel("Successful Retrievals (%)", fontsize=14, fontweight="bold")
-    plt.title(f"(b) Fixed N=100, T=70{title_suffix}", fontsize=16, fontweight="bold", pad=20)
-    plt.grid(True, alpha=0.3, linestyle="--")
-    plt.ylim([-5, 105])
-    plt.yticks(np.arange(0, 101, 20))
-    plt.tight_layout()
-    plt.savefig(output_path / ("figure5b_split.png" if not with_repetition else "figure5b_split_repetition.png"),
-                dpi=300, bbox_inches="tight")
-    if show_images:
-        plt.show()
-    else:
-        plt.close()
 
-    # 写摘要
-    summary = output_path / ("results_split_summary.txt" if not with_repetition else "results_split_summary_repetition.txt")
+    title_suffix = " (with single-step repetition)" if with_repetition else ""
+
+    plot_figure5(
+        results_v_only_T_scan,
+        results_uv_T_scan,
+        param_name="T",
+        param_values=cfg.T_values,
+        save_path=output_path
+        / ("figure5a_split.png" if not with_repetition else "figure5a_split_repetition.png"),
+        show_plot=show_images,
+        title_suffix=title_suffix,
+    )
+
+    plot_figure5(
+        results_v_only_Nh_scan,
+        results_uv_Nh_scan,
+        param_name="N_h",
+        param_values=cfg.N_h_values,
+        save_path=output_path
+        / ("figure5b_split.png" if not with_repetition else "figure5b_split_repetition.png"),
+        show_plot=show_images,
+        title_suffix=title_suffix,
+    )
+
+    summary = output_path / (
+        "results_split_summary.txt" if not with_repetition else "results_split_summary_repetition.txt"
+    )
     with summary.open("w", encoding="utf-8") as f:
         f.write("Figure 5 拆分模式对比\n")
         f.write("=" * 80 + "\n\n")
         f.write(f"参数: num_trials={cfg.num_trials}, noise_num={cfg.noise_num}, num_epochs={cfg.num_epochs}\n")
         f.write(f"with_repetition={with_repetition}, repetition_position={repetition_position}\n\n")
-        f.write("(a) V-only 扫描 T (N=100, M=500)\n")
-        f.write("-" * 80 + "\n")
-        f.write(f"{'T':<8} {'V-only (%)':<15}\n")
-        f.write("-" * 80 + "\n")
-        for r in results_v_only_T_scan:
-            f.write(f"{r['T']:<8} {r['recall_accuracy']*100:<15.1f}\n")
-        f.write("\n(b) U+V 扫描 M (N=100, T=70)\n")
-        f.write("-" * 80 + "\n")
-        f.write(f"{'M':<8} {'U+V (%)':<15}\n")
-        f.write("-" * 80 + "\n")
-        for r in results_uv_Nh_scan:
-            f.write(f"{r['N_h']:<8} {r['recall_accuracy']*100:<15.1f}\n")
 
-    return results_v_only_T_scan, results_uv_Nh_scan, output_path
+        f.write("(a) 扫描 T，比较 V-only vs U+V (N=100, M=500)\n")
+        f.write("-" * 80 + "\n")
+        f.write(f"{'T':<8} {'V-only (%)':<15} {'U+V (%)':<15} {'Improvement':<15}\n")
+        f.write("-" * 80 + "\n")
+        for idx, T_value in enumerate(cfg.T_values):
+            v_only = results_v_only_T_scan[idx]["recall_accuracy"] * 100
+            uv = results_uv_T_scan[idx]["recall_accuracy"] * 100
+            f.write(f"{T_value:<8} {v_only:<15.1f} {uv:<15.1f} {uv - v_only:+.1f}\n")
+
+        f.write("\n(b) 扫描 N_h，比较 V-only vs U+V (N=100, T=70)\n")
+        f.write("-" * 80 + "\n")
+        f.write(f"{'M':<8} {'V-only (%)':<15} {'U+V (%)':<15} {'Improvement':<15}\n")
+        f.write("-" * 80 + "\n")
+        for idx, N_h_value in enumerate(cfg.N_h_values):
+            v_only = results_v_only_Nh_scan[idx]["recall_accuracy"] * 100
+            uv = results_uv_Nh_scan[idx]["recall_accuracy"] * 100
+            f.write(f"{N_h_value:<8} {v_only:<15.1f} {uv:<15.1f} {uv - v_only:+.1f}\n")
+
+    return (
+        results_v_only_T_scan,
+        results_uv_T_scan,
+        results_v_only_Nh_scan,
+        results_uv_Nh_scan,
+        output_path,
+    )
