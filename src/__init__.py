@@ -6,7 +6,18 @@
 from .core import SequenceAttractorNetwork
 
 # 扩展模型
-from .models import MultiSequenceAttractorNetwork
+from .models import (
+    MemorySequenceAttractorNetwork,
+    MultiSequenceAttractorNetwork,
+    IncrementalSequenceAttractorNetwork,
+    PatternRepetitionNetwork
+)
+
+# 实验工具
+from .experiments import (
+    plot_figure5,
+    run_figure5_experiments
+)
 
 # 工具函数
 from .utils import (
@@ -21,7 +32,13 @@ __all__ = [
     # 核心类
     'SequenceAttractorNetwork',
     # 扩展模型
+    'MemorySequenceAttractorNetwork',
     'MultiSequenceAttractorNetwork',
+    'IncrementalSequenceAttractorNetwork',
+    'PatternRepetitionNetwork',
+    # 实验工具
+    'plot_figure5',
+    'run_figure5_experiments',
     # 工具函数
     'visualize_training_results',
     'visualize_robustness',

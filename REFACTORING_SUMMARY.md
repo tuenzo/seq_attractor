@@ -36,6 +36,14 @@ tests/                 # 测试文件（预留）
   - 支持同时学习多个序列
   - 交替训练和批量训练两种模式
   - 跨序列唯一性检查
+- ✅ `incremental.py`: 增量学习模型
+  - 支持在学习新序列的同时保持旧序列的记忆
+  - 记录每个序列的训练信息
+  - 提供记忆状态查询和测试功能
+- ✅ `pattern_repetition.py`: 模式重复模型
+  - 支持生成具有重复模式的序列（交替、周期、块状、镜像等）
+  - 提供模式结构分析功能
+  - 支持序列重叠分析
 
 ### 4. 统一接口
 - ✅ 创建 `src/__init__.py` 提供统一导入接口
@@ -65,9 +73,10 @@ tests/                 # 测试文件（预留）
 
 以下工作可以在后续继续完成：
 
-- [ ] 创建增量学习模型 (`src/models/incremental.py`)
-- [ ] 创建模式重复模型 (`src/models/pattern_repetition.py`)
-- [ ] 更新所有旧示例脚本使用新结构
+- [x] 创建增量学习模型 (`src/models/incremental.py`) ✅
+- [x] 创建模式重复模型 (`src/models/pattern_repetition.py`) ✅
+- [x] 更新示例脚本使用新结构 ✅
+- [ ] 更新所有旧示例脚本使用新结构（可选）
 - [ ] 添加单元测试 (`tests/`)
 - [ ] 完善文档和注释
 
@@ -79,13 +88,20 @@ tests/                 # 测试文件（预留）
 from src import (
     SequenceAttractorNetwork,
     MultiSequenceAttractorNetwork,
+    IncrementalSequenceAttractorNetwork,
+    PatternRepetitionNetwork,
     visualize_training_results,
-    visualize_robustness
+    visualize_robustness,
+    visualize_multi_sequence_overview
 )
 
 # 方式2: 从具体模块导入
 from src.core import SequenceAttractorNetwork
-from src.models import MultiSequenceAttractorNetwork
+from src.models import (
+    MultiSequenceAttractorNetwork,
+    IncrementalSequenceAttractorNetwork,
+    PatternRepetitionNetwork
+)
 from src.utils import visualize_training_results
 ```
 
@@ -93,6 +109,54 @@ from src.utils import visualize_training_results
 ```bash
 cd examples
 python basic_example.py
+```
+
+### 使用示例
+
+#### 增量学习
+```python
+from src import IncrementalSequenceAttractorNetwork
+
+# 创建网络
+network = IncrementalSequenceAttractorNetwork(N_v=50, T=30, eta=0.01)
+
+# 学习第一个序列
+seq1 = network.generate_random_sequence(seed=100)
+network.train(x=seq1, num_epochs=300)
+
+# 增量学习第二个序列（保持第一个序列的记忆）
+seq2 = network.generate_random_sequence(seed=200)
+network.train(x=seq2, num_epochs=300, incremental=True)
+
+# 测试所有记忆
+memory_test = network.test_all_memories(verbose=True)
+```
+
+#### 模式重复
+```python
+from src import PatternRepetitionNetwork
+
+# 创建网络
+network = PatternRepetitionNetwork(N_v=50, T=40, eta=0.01)
+
+# 生成具有不同模式的序列
+pattern_configs = [
+    {'pattern_type': 'alternating'},
+    {'pattern_type': 'periodic', 'period': 4},
+    {'pattern_type': 'block', 'block_size': 5},
+]
+sequences = network.generate_multiple_patterned_sequences(
+    num_sequences=3,
+    pattern_configs=pattern_configs
+)
+
+# 分析模式结构
+for seq in sequences:
+    analysis = network.analyze_pattern_structure(seq)
+    print(f"重复率: {analysis['repetition_rate']*100:.1f}%")
+
+# 训练
+network.train(x=sequences, num_epochs=400)
 ```
 
 ## 文件变更
@@ -104,6 +168,8 @@ python basic_example.py
 - `src/utils/evaluation.py`
 - `src/utils/__init__.py`
 - `src/models/multi_sequence.py`
+- `src/models/incremental.py`
+- `src/models/pattern_repetition.py`
 - `src/models/__init__.py`
 - `src/__init__.py`
 - `examples/basic_example.py`
@@ -120,11 +186,11 @@ python basic_example.py
 
 ## 下一步建议
 
-1. **测试新结构**: 运行示例脚本确保功能正常
-2. **逐步迁移**: 将现有代码迁移到新结构
-3. **完善功能**: 添加增量学习和模式重复模型
+1. **测试新结构**: 运行示例脚本确保功能正常 ✅
+2. **逐步迁移**: 将现有代码迁移到新结构（可选）
+3. **完善功能**: 添加增量学习和模式重复模型 ✅
 4. **添加测试**: 编写单元测试确保代码质量
-5. **更新文档**: 完善使用文档和API文档
+5. **更新文档**: 完善使用文档和API文档 ✅
 
 ## 注意事项
 

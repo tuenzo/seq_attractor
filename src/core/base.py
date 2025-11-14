@@ -5,8 +5,13 @@
 ================================================================
 """
 
+import os
+
+os.environ.setdefault("NPY_DISABLE_MAC_OS_ACCELERATE", "1")
+
 import numpy as np
 from typing import Optional, Dict
+from ..utils.evaluation import evaluate_replay_full_sequence
 
 
 class SequenceAttractorNetwork:
@@ -291,4 +296,27 @@ class SequenceAttractorNetwork:
             robustness_scores[i] = result['success_rate']
         
         return robustness_scores
+    
+    def evaluate_replay(self, xi_replayed: np.ndarray, 
+                       include_frame_matching: bool = True) -> Dict:
+        """
+        评估回放序列的质量
+        
+        参数:
+            xi_replayed: 回放序列 (max_steps x N_v)
+            include_frame_matching: 是否包含逐帧匹配信息
+            
+        返回:
+            评估结果字典，包含:
+            - found_sequence: 是否找到完整序列
+            - recall_accuracy: 回放准确率
+            - match_start_idx: 匹配开始位置
+            - match_indices: 逐帧匹配索引（如果include_frame_matching=True）
+        """
+        assert self.training_sequence is not None, "请先训练网络"
+        return evaluate_replay_full_sequence(
+            xi_replayed=xi_replayed,
+            target_sequence=self.training_sequence,
+            include_frame_matching=include_frame_matching
+        )
 
