@@ -54,17 +54,19 @@ python scripts/sa_cli.py fig5-split --trials 100 --epochs 500 --show
 - `--Nh-values`：扫描的 `M(N_h)` 列表，如 `100,325,550,775,1000`
 - `--with-repetition`：在训练序列中注入“单步重复”
 - `--repeat-pos`：重复发生的位置（默认在中点）
+- `--progress`：显示 tqdm 进度条（默认关闭，可按需开启）
+- `--workers`：并行进程数，`1`=串行，`-1`=自动使用约75%核心，`0`=全部核心
 
 示例：
 ```bash
 # 标准拆分模式（无重复）
-python scripts/sa_cli.py fig5-split --trials 100 --epochs 500 --show
+python scripts/sa_cli.py fig5-split --trials 100 --epochs 500 --show --workers -1
 
 # 在序列中注入单步重复（默认在中点）
-python scripts/sa_cli.py fig5-split --with-repetition --show
+python scripts/sa_cli.py fig5-split --with-repetition --show --workers -1
 
 # 自定义扫描范围
-python scripts/sa_cli.py fig5-split --T-values 10,30,50,70,110 --Nh-values 100,325,550,775,1000 --show
+python scripts/sa_cli.py fig5-split --T-values 10,30,50,70,110 --Nh-values 100,325,550,775,1000 --show --workers 4
 ```
 
 ## 测试

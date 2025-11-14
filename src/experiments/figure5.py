@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+
+import math
+import os
 
 import matplotlib
 
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 import numpy as np
+
+try:
+    from tqdm.auto import tqdm
+except Exception:  # pragma: no cover - tqdm is optional at runtime
+    tqdm = None
 
 from ..core import SequenceAttractorNetwork
 
@@ -39,6 +49,130 @@ def _ensure_output_dir(output_dir: Optional[Path], *, create_timestamp: bool) ->
         target_dir = base_dir
     target_dir.mkdir(parents=True, exist_ok=True)
     return target_dir
+
+
+def _create_progress_bar(total: int, *, enabled: bool, desc: str):
+    if not enabled or total <= 1 or tqdm is None:
+        return None
+    return tqdm(total=total, desc=desc, leave=False, unit="cfg")
+
+
+def _resolve_worker_count(requested: Optional[int]) -> int:
+    """
+    Translate user input into an actual worker count.
+
+    Semantics:
+    - None or <= 1 → run sequentially.
+    - -1 → use 75% of available CPUs (at least 1).
+    - 0 → use all available CPUs.
+    - N > 1 → use min(N, cpu_count).
+    """
+
+    if requested is None or requested <= 1:
+        return 1
+
+    total = os.cpu_count() or 1
+    if requested == -1:
+        return max(1, math.floor(total * 0.75))
+    if requested == 0:
+        return total
+    if requested < -1:
+        raise ValueError(f"Invalid worker count: {requested}")
+    return max(1, min(requested, total))
+
+
+def _single_trial_evaluation(
+    params: Dict,
+    num_epochs: int,
+    noise_level: float,
+    v_only: bool,
+    with_repetition: bool,
+    repetition_position: Optional[int],
+    trial: int,
+) -> bool:
+    network = SequenceAttractorNetwork(**params)
+
+    if with_repetition:
+        x_train = _generate_sequence_with_single_repetition(
+            T=params["T"],
+            N_v=params["N_v"],
+            seed=trial,
+            repeat_pos=repetition_position,
+        )
+        train_seed = None
+    else:
+        x_train = None
+        train_seed = trial
+
+    network.train(
+        x=x_train,
+        num_epochs=num_epochs,
+        verbose=False,
+        seed=train_seed,
+        V_only=v_only,
+    )
+    robustness = network.test_robustness(
+        noise_levels=np.array([noise_level]),
+        num_trials=1,
+        verbose=False,
+    )
+    return bool(robustness[0] > 0.5)
+
+
+def _run_trials(
+    params: Dict,
+    *,
+    cfg: Figure5Config,
+    v_only: bool,
+    num_workers: int,
+    with_repetition: bool = False,
+    repetition_position: Optional[int] = None,
+    show_trial_progress: bool = False,
+) -> float:
+    noise_level = cfg.noise_level(params["N_v"])
+    trial_fn = partial(
+        _single_trial_evaluation,
+        params,
+        cfg.num_epochs,
+        noise_level,
+        v_only,
+        with_repetition,
+        repetition_position,
+    )
+
+    if num_workers <= 1:
+        success_count = 0
+        trial_iter = range(cfg.num_trials)
+        if show_trial_progress and tqdm is not None:
+            trial_iter = tqdm(
+                trial_iter,
+                total=cfg.num_trials,
+                desc=f"{'V-only' if v_only else 'U+V'} trials",
+                leave=False,
+                ncols=80,
+            )
+        for trial in trial_iter:
+            if trial_fn(trial):
+                success_count += 1
+        return success_count / cfg.num_trials
+
+    # 限制worker数量不超过trials数量
+    num_workers = min(num_workers, cfg.num_trials)
+
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        trial_iter = executor.map(trial_fn, range(cfg.num_trials))
+        if show_trial_progress and tqdm is not None:
+            trial_iter = tqdm(
+                trial_iter,
+                total=cfg.num_trials,
+                desc=f"{'V-only' if v_only else 'U+V'} trials",
+                leave=False,
+                ncols=80,
+            )
+        successes = list(trial_iter)
+        success_count = sum(1 for result in successes if result)
+
+    return success_count / cfg.num_trials
 
 
 def plot_figure5(
@@ -118,46 +252,42 @@ def _run_single_configuration(
     config: Figure5Config,
     v_only: bool,
     progress: Optional[Callable[[int, int, int], None]] = None,
+    use_progress: bool = False,
+    progress_label: Optional[str] = None,
+    num_workers: int = 1,
 ) -> List[Dict]:
     results: List[Dict] = []
     total = len(varying_values)
+    bar_desc = progress_label or f"{'V-only' if v_only else 'U+V'}: {varying_key}"
+    bar = _create_progress_bar(total, enabled=use_progress, desc=bar_desc)
 
-    for idx, value in enumerate(varying_values):
-        params = dict(base_params)
-        params[varying_key] = value
-        success_count = 0
-
-        for trial in range(config.num_trials):
-            network = SequenceAttractorNetwork(**params)
-            network.train(
-                x=None,
-                num_epochs=config.num_epochs,
-                verbose=False,
-                seed=trial,
-                V_only=v_only,
+    try:
+        for idx, value in enumerate(varying_values):
+            params = dict(base_params)
+            params[varying_key] = value
+            success_rate = _run_trials(
+                params,
+                cfg=config,
+                v_only=v_only,
+                num_workers=num_workers,
+                show_trial_progress=use_progress,
+            )
+            results.append(
+                {
+                    varying_key: value,
+                    "recall_accuracy": success_rate,
+                    **{k: v for k, v in params.items() if k != varying_key},
+                }
             )
 
-            noise_level = config.noise_level(params["N_v"])
-            robustness = network.test_robustness(
-                noise_levels=np.array([noise_level]),
-                num_trials=1,
-                verbose=False,
-            )
-
-            if robustness[0] > 0.5:
-                success_count += 1
-
-        success_rate = success_count / config.num_trials
-        results.append(
-            {
-                varying_key: value,
-                "recall_accuracy": success_rate,
-                **{k: v for k, v in params.items() if k != varying_key},
-            }
-        )
-
-        if progress is not None:
-            progress(idx + 1, total, value)
+            if progress is not None:
+                progress(idx + 1, total, value)
+            if bar is not None:
+                bar.update(1)
+                bar.set_postfix({varying_key: value}, refresh=False)
+    finally:
+        if bar is not None:
+            bar.close()
 
     return results
 
@@ -169,18 +299,21 @@ def run_figure5_experiments(
     create_timestamp_dir: bool = True,
     show_images: bool = False,
     progress_callback: Optional[Callable[[str, int, int, int], None]] = None,
+    use_progress: bool = False,
+    workers: Optional[int] = None,
 ) -> Tuple[List[Dict], List[Dict], List[Dict], List[Dict], Path]:
-    """Execute the Figure 5 experiments and optionally store artefacts."""
+    """Execute the Figure 5 experiments with optional multiprocessing."""
 
     cfg = config or Figure5Config()
     output_path = _ensure_output_dir(output_dir, create_timestamp=create_timestamp_dir)
+    worker_count = _resolve_worker_count(workers)
 
     def report(stage: str, current: int, total: int, value: int) -> None:
         if progress_callback is not None:
             progress_callback(stage, current, total, value)
 
-    base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.01, "kappa": 1.0}
-    base_params_b = {"N_v": 100, "T": 70, "eta": 0.01, "kappa": 1.0}
+    base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0}
+    base_params_b = {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0}
 
     results_v_only_a = _run_single_configuration(
         {**base_params_a},
@@ -188,7 +321,12 @@ def run_figure5_experiments(
         cfg.T_values,
         config=cfg,
         v_only=True,
-        progress=None if progress_callback is None else lambda current, total, value: report("V_only_T", current, total, value),
+        progress=None
+        if progress_callback is None
+        else lambda current, total, value: report("V_only_T", current, total, value),
+        use_progress=use_progress,
+        progress_label="V-only: scan T",
+        num_workers=worker_count,
     )
 
     results_uv_a = _run_single_configuration(
@@ -197,7 +335,12 @@ def run_figure5_experiments(
         cfg.T_values,
         config=cfg,
         v_only=False,
-        progress=None if progress_callback is None else lambda current, total, value: report("UV_T", current, total, value),
+        progress=None
+        if progress_callback is None
+        else lambda current, total, value: report("UV_T", current, total, value),
+        use_progress=use_progress,
+        progress_label="U+V: scan T",
+        num_workers=worker_count,
     )
 
     results_v_only_b = _run_single_configuration(
@@ -206,7 +349,12 @@ def run_figure5_experiments(
         cfg.N_h_values,
         config=cfg,
         v_only=True,
-        progress=None if progress_callback is None else lambda current, total, value: report("V_only_N_h", current, total, value),
+        progress=None
+        if progress_callback is None
+        else lambda current, total, value: report("V_only_N_h", current, total, value),
+        use_progress=use_progress,
+        progress_label="V-only: scan N_h",
+        num_workers=worker_count,
     )
 
     results_uv_b = _run_single_configuration(
@@ -215,7 +363,12 @@ def run_figure5_experiments(
         cfg.N_h_values,
         config=cfg,
         v_only=False,
-        progress=None if progress_callback is None else lambda current, total, value: report("UV_N_h", current, total, value),
+        progress=None
+        if progress_callback is None
+        else lambda current, total, value: report("UV_N_h", current, total, value),
+        use_progress=use_progress,
+        progress_label="U+V: scan N_h",
+        num_workers=worker_count,
     )
 
     plot_figure5(
@@ -269,48 +422,6 @@ def run_figure5_experiments(
 # ========= 拆分模式版本：每个子图对比仅训练 V 与训练 U+V =========
 
 
-def _evaluate_single_split_point(
-    params: Dict,
-    *,
-    cfg: Figure5Config,
-    v_only: bool,
-    with_repetition: bool,
-    repetition_position: Optional[int],
-) -> float:
-    success_count = 0
-    for trial in range(cfg.num_trials):
-        net = SequenceAttractorNetwork(**params)
-
-        if with_repetition:
-            x_train = _generate_sequence_with_single_repetition(
-                T=params["T"],
-                N_v=params["N_v"],
-                seed=trial,
-                repeat_pos=repetition_position,
-            )
-            train_seed = None
-        else:
-            x_train = None
-            train_seed = trial
-
-        net.train(
-            x=x_train,
-            num_epochs=cfg.num_epochs,
-            verbose=False,
-            seed=train_seed,
-            V_only=v_only,
-        )
-        noise_level = cfg.noise_level(params["N_v"])
-        robustness = net.test_robustness(
-            noise_levels=np.array([noise_level]),
-            num_trials=1,
-            verbose=False,
-        )
-        if robustness[0] > 0.5:
-            success_count += 1
-    return success_count / cfg.num_trials
-
-
 def _run_split_configuration(
     base_params: Dict,
     varying_key: str,
@@ -319,42 +430,60 @@ def _run_split_configuration(
     cfg: Figure5Config,
     with_repetition: bool,
     repetition_position: Optional[int],
+    use_progress: bool = False,
+    progress_label: Optional[str] = None,
+    num_workers: int = 1,
 ) -> Tuple[List[Dict], List[Dict]]:
     results_v_only: List[Dict] = []
     results_uv: List[Dict] = []
+    total = len(varying_values)
+    desc = progress_label or f"Split scan: {varying_key}"
+    bar = _create_progress_bar(total, enabled=use_progress, desc=desc)
 
-    for value in varying_values:
-        params = dict(base_params)
-        params[varying_key] = int(value)
+    try:
+        for value in varying_values:
+            params = dict(base_params)
+            params[varying_key] = int(value)
 
-        success_v = _evaluate_single_split_point(
-            params,
-            cfg=cfg,
-            v_only=True,
-            with_repetition=with_repetition,
-            repetition_position=repetition_position,
-        )
-        success_uv = _evaluate_single_split_point(
-            params,
-            cfg=cfg,
-            v_only=False,
-            with_repetition=with_repetition,
-            repetition_position=repetition_position,
-        )
+            success_v = _run_trials(
+                params,
+                cfg=cfg,
+                v_only=True,
+                num_workers=num_workers,
+                with_repetition=with_repetition,
+                repetition_position=repetition_position,
+                show_trial_progress=use_progress,
+            )
+            success_uv = _run_trials(
+                params,
+                cfg=cfg,
+                v_only=False,
+                num_workers=num_workers,
+                with_repetition=with_repetition,
+                repetition_position=repetition_position,
+                show_trial_progress=use_progress,
+            )
 
-        common_metadata = {
-            varying_key: params[varying_key],
-            "recall_accuracy": 0.0,  # placeholder to overwrite below
-            "N_v": params["N_v"],
-            "with_repetition": with_repetition,
-        }
-        if "T" in params:
-            common_metadata["T"] = params["T"]
-        if "N_h" in params:
-            common_metadata["N_h"] = params["N_h"]
+            common_metadata = {
+                varying_key: params[varying_key],
+                "recall_accuracy": 0.0,  # placeholder to overwrite below
+                "N_v": params["N_v"],
+                "with_repetition": with_repetition,
+            }
+            if "T" in params:
+                common_metadata["T"] = params["T"]
+            if "N_h" in params:
+                common_metadata["N_h"] = params["N_h"]
 
-        results_v_only.append({**common_metadata, "recall_accuracy": success_v})
-        results_uv.append({**common_metadata, "recall_accuracy": success_uv})
+            results_v_only.append({**common_metadata, "recall_accuracy": success_v})
+            results_uv.append({**common_metadata, "recall_accuracy": success_uv})
+
+            if bar is not None:
+                bar.update(1)
+                bar.set_postfix({varying_key: params[varying_key]}, refresh=False)
+    finally:
+        if bar is not None:
+            bar.close()
 
     return results_v_only, results_uv
 
@@ -388,19 +517,23 @@ def run_figure5_experiments_split_modes(
     show_images: bool = False,
     with_repetition: bool = False,
     repetition_position: Optional[int] = None,
+    use_progress: bool = False,
+    workers: Optional[int] = None,
 ) -> Tuple[List[Dict], List[Dict], List[Dict], List[Dict], Path]:
     """
     拆分模式对比：
     - 图(a)：固定 N_h=500，扫描 T，比较仅训练 V 与训练 U+V
     - 图(b)：固定 T=70，扫描 N_h，比较仅训练 V 与训练 U+V
     可选：with_repetition=True 时，在训练序列中引入单步重复。
+    use_progress=True 时，将显示 tqdm 进度条。
     返回：(results_v_only_T_scan, results_uv_T_scan, results_v_only_Nh_scan, results_uv_Nh_scan, output_path)
     """
     cfg = config or Figure5Config()
     output_path = _ensure_output_dir(output_dir, create_timestamp=create_timestamp_dir)
+    worker_count = _resolve_worker_count(workers)
 
-    base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.01, "kappa": 1.0}
-    base_params_b = {"N_v": 100, "T": 70, "eta": 0.01, "kappa": 1.0}
+    base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0}
+    base_params_b = {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0}
 
     results_v_only_T_scan, results_uv_T_scan = _run_split_configuration(
         base_params_a,
@@ -409,6 +542,9 @@ def run_figure5_experiments_split_modes(
         cfg=cfg,
         with_repetition=with_repetition,
         repetition_position=repetition_position,
+        use_progress=use_progress,
+        progress_label="Split scan: T",
+        num_workers=worker_count,
     )
 
     results_v_only_Nh_scan, results_uv_Nh_scan = _run_split_configuration(
@@ -418,6 +554,9 @@ def run_figure5_experiments_split_modes(
         cfg=cfg,
         with_repetition=with_repetition,
         repetition_position=repetition_position,
+        use_progress=use_progress,
+        progress_label="Split scan: N_h",
+        num_workers=worker_count,
     )
 
     title_suffix = " (with single-step repetition)" if with_repetition else ""

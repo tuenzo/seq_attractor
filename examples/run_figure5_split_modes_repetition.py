@@ -7,6 +7,7 @@
 
 import os
 import sys
+import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -18,8 +19,8 @@ def main() -> None:
         num_trials=100,
         noise_num=10,
         num_epochs=500,
-        T_values=(10, 30, 50, 70, 90, 110, 140),
-        N_h_values=(100, 325, 550, 775, 1000),
+        T_values=np.linspace(10, 140, 14, dtype=int),
+        N_h_values=np.linspace(100, 1000, 11, dtype=int),
     )
     run_figure5_experiments_split_modes(
         config=cfg,
@@ -28,6 +29,8 @@ def main() -> None:
         show_images=True,
         with_repetition=True,
         repetition_position=None,  # None=默认中点
+        use_progress=True,
+        workers=-1,
     )
 
 

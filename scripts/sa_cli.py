@@ -39,6 +39,13 @@ def main() -> None:
                         help="Comma-separated list, e.g. 10,30,50,70")
     common.add_argument("--Nh-values", type=_parse_int_list, default=(100, 325, 550, 775, 1000),
                         help="Comma-separated list, e.g. 100,325,550,775,1000")
+    common.add_argument("--progress", action="store_true", help="Display tqdm progress bars")
+    common.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Worker processes (-1=75%% cores, 0=all cores, default=1)",
+    )
 
     p_split = sub.add_parser(
         "fig5-split",
@@ -66,6 +73,8 @@ def main() -> None:
             show_images=bool(args.show),
             with_repetition=bool(args.with_repetition),
             repetition_position=args.repeat_pos,
+            use_progress=bool(args.progress),
+            workers=int(args.workers),
         )
     else:
         parser.error(f"Unknown command: {args.command}")
