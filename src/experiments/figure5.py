@@ -70,7 +70,7 @@ def _resolve_worker_count(requested: Optional[int], reserve_ratio: float = 0.25)
         reserve_ratio: Ratio of CPUs to reserve for system (default 0.25 = 25%)
     """
 
-    if requested is None or requested <= 1:
+    if requested is None or requested < -1:
         return 1
 
     total = cpu_count() or 1
@@ -576,6 +576,7 @@ def run_figure5_experiments_split_modes(
     cfg = config or Figure5Config()
     output_path = _ensure_output_dir(output_dir, create_timestamp=create_timestamp_dir)
     worker_count = _resolve_worker_count(workers)
+    print(f"worker_count: {worker_count}")
 
     base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0}
     base_params_b = {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0}
