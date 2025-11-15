@@ -42,8 +42,9 @@ class MemorySequenceAttractorNetwork(SequenceAttractorNetwork):
         N_h: Optional[int] = None,
         eta: float = 0.001,
         kappa: float = 1,
+        seed: Optional[int] = None,
     ) -> None:
-        super().__init__(N_v=N_v, T=T, N_h=N_h, eta=eta, kappa=kappa)
+        super().__init__(N_v=N_v, T=T, N_h=N_h, eta=eta, kappa=kappa, seed=seed)
 
         self.training_sequences: List[np.ndarray] = []
         self.sequence_training_info: List[Dict] = []
@@ -79,6 +80,7 @@ class MemorySequenceAttractorNetwork(SequenceAttractorNetwork):
         T: Optional[int] = None,
         ensure_unique_across: bool = True,
         max_attempts: int = 1000,
+        verbose: bool = False,
     ) -> List[np.ndarray]:
         """生成多个随机序列，可选跨序列唯一性约束。"""
         sequences: List[np.ndarray] = []
@@ -93,14 +95,16 @@ class MemorySequenceAttractorNetwork(SequenceAttractorNetwork):
                 sequences.append(seq)
             return sequences
 
-        print(f"生成 {num_sequences} 个序列，确保跨序列唯一性...")
+        if verbose:
+            print(f"生成 {num_sequences} 个序列，确保跨序列唯一性...")
         all_used_frames: List[np.ndarray] = []
 
         for seq_idx, seed in enumerate(seeds[:num_sequences]):
             if seed is not None:
                 np.random.seed(seed)
 
-            print(f"  正在生成序列 #{seq_idx + 1}...", end=" ")
+            if verbose:
+                print(f"  正在生成序列 #{seq_idx + 1}...", end=" ")
             seq = np.zeros((seq_length, self.N_v))
 
             for t in range(seq_length - 1):
@@ -129,17 +133,20 @@ class MemorySequenceAttractorNetwork(SequenceAttractorNetwork):
                     attempts += 1
 
                 if attempts >= max_attempts and candidate_frame is not None:
-                    print(
-                        f"\n警告: 序列 #{seq_idx + 1} 位置 {t} 无法生成唯一帧"
-                        f"（尝试 {max_attempts} 次）"
-                    )
+                    if verbose:
+                        print(
+                            f"\n警告: 序列 #{seq_idx + 1} 位置 {t} 无法生成唯一帧"
+                            f"（尝试 {max_attempts} 次）"
+                        )
                     seq[t, :] = candidate_frame  # type: ignore[assignment]
 
             seq[seq_length - 1, :] = seq[0, :]
             sequences.append(seq)
-            print("完成")
+            if verbose:
+                print("完成")
 
-        print("所有序列生成完毕\n")
+        if verbose:
+            print("所有序列生成完毕\n")
         return sequences
 
     # ------------------------------------------------------------------

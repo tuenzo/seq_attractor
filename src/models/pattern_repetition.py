@@ -17,9 +17,9 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
     """
     
     def __init__(self, N_v: int, T: int, N_h: Optional[int] = None, 
-                 eta: float = 0.001, kappa: float = 1):
+                 eta: float = 0.001, kappa: float = 1, seed: Optional[int] = None):
         """初始化网络"""
-        super().__init__(N_v, T, N_h, eta, kappa)
+        super().__init__(N_v, T, N_h, eta, kappa, seed=seed)
         
         # 模式重复专用属性
         self.pattern_info = {}  # 存储模式信息
@@ -180,7 +180,8 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
         seeds: Optional[List[int]] = None,
         T: Optional[int] = None,
         ensure_unique_non_shared: bool = True,
-        max_attempts: int = 1000
+        max_attempts: int = 1000,
+        verbose: bool = True
     ) -> List[np.ndarray]:
         """
         生成包含共享模式的多个序列（支持非共享区域唯一性约束）
@@ -204,12 +205,14 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
         shared_patterns = self._generate_all_shared_patterns(pattern_config)
         sequences = []
         all_used_frames: List[Tuple[np.ndarray, int, int]] = []
-        print(f"生成 {num_sequences} 个序列，确保非共享区域唯一...")
+        if verbose:
+            print(f"生成 {num_sequences} 个序列，确保非共享区域唯一...")
         for seq_idx in range(num_sequences):
             seed = seeds[seq_idx] if seq_idx < len(seeds) else None
             if seed is not None:
                 np.random.seed(seed)
-            print(f"  正在生成序列 #{seq_idx}...", end=" ")
+            if verbose:
+                print(f"  正在生成序列 #{seq_idx}...", end=" ")
             seq = np.zeros((seq_length, self.N_v))
             shared_pos_set = shared_positions.get(seq_idx, set())
             for t in range(seq_length - 1):
@@ -242,14 +245,17 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
                         break
                     attempts += 1
                 if attempts >= max_attempts and candidate_frame is not None:
-                    print(f"\n警告: 序列 #{seq_idx} 位置 {t} 无法生成唯一帧（尝试 {max_attempts} 次）")
+                    if verbose:
+                        print(f"\n警告: 序列 #{seq_idx} 位置 {t} 无法生成唯一帧（尝试 {max_attempts} 次）")
                     seq[t, :] = candidate_frame
                     all_used_frames.append((candidate_frame.copy(), seq_idx, t))
             if (seq_length - 1) not in shared_pos_set:
                 seq[seq_length - 1, :] = seq[0, :]
             sequences.append(seq)
-            print("完成")
-        print("  应用共享模式...")
+            if verbose:
+                print("完成")
+        if verbose:
+            print("  应用共享模式...")
         self._apply_shared_patterns_from_generated(sequences, pattern_config, shared_patterns, seq_length)
         self.pattern_info = {
             'config': pattern_config,
@@ -259,8 +265,9 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
             'ensure_unique_non_shared': ensure_unique_non_shared
         }
         if ensure_unique_non_shared:
-            self._verify_non_shared_uniqueness(sequences, shared_positions)
-        print("所有序列生成完毕\n")
+            self._verify_non_shared_uniqueness(sequences, shared_positions, verbose=verbose)
+        if verbose:
+            print("所有序列生成完毕\n")
         return sequences
     
     def generate_sequences_with_custom_patterns(
@@ -271,7 +278,8 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
         positions_per_group: List[List[List[Tuple[int, int]]]],
         seeds: Optional[List[int]] = None,
         T: Optional[int] = None,
-        ensure_unique_non_shared: bool = True
+        ensure_unique_non_shared: bool = True,
+        verbose: bool = True
     ) -> List[np.ndarray]:
         """
         使用直观配置生成包含共享模式的序列
@@ -295,7 +303,8 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
             pattern_config=pattern_config,
             seeds=seeds,
             T=T,
-            ensure_unique_non_shared=ensure_unique_non_shared
+            ensure_unique_non_shared=ensure_unique_non_shared,
+            verbose=verbose
         )
     
     def _validate_pattern_config(self, config: Dict, num_sequences: int, seq_length: int):
@@ -395,10 +404,12 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
     def _verify_non_shared_uniqueness(
         self,
         sequences: List[np.ndarray],
-        shared_positions: Dict[int, set]
+        shared_positions: Dict[int, set],
+        verbose: bool = True
     ):
         """验证非共享区域是否满足唯一性"""
-        print("\n验证非共享区域唯一性...")
+        if verbose:
+            print("\n验证非共享区域唯一性...")
         non_shared_frames: List[Tuple[np.ndarray, int, int]] = []
         for seq_idx, seq in enumerate(sequences):
             shared_pos_set = shared_positions.get(seq_idx, set())
@@ -412,23 +423,24 @@ class PatternRepetitionNetwork(MemorySequenceAttractorNetwork):
                 frame_j, seq_j, pos_j = non_shared_frames[j]
                 if np.array_equal(frame_i, frame_j):
                     duplicates_found.append((seq_i, pos_i, seq_j, pos_j))
-        if duplicates_found:
-            print(f"⚠️  发现 {len(duplicates_found)} 处非共享区域重复:")
-            for seq_i, pos_i, seq_j, pos_j in duplicates_found[:5]:
-                print(f"    序列 #{seq_i} 位置 {pos_i} 与 序列 #{seq_j} 位置 {pos_j} 重复")
-            if len(duplicates_found) > 5:
-                print(f"    ... 还有 {len(duplicates_found) - 5} 处重复")
-        else:
-            print("✓ 非共享区域完全唯一")
-        total_shared = sum(len(pos_set) for pos_set in shared_positions.values())
-        seq_length = sequences[0].shape[0]
-        total_frames = len(sequences) * (seq_length - 1)
-        total_non_shared = total_frames - total_shared
-        print("\n统计信息:")
-        print(f"  总帧数: {total_frames}")
-        print(f"  共享帧数: {total_shared} ({(total_shared / total_frames * 100) if total_frames > 0 else 0:.1f}%)")
-        print(f"  非共享帧数: {total_non_shared} ({(total_non_shared / total_frames * 100) if total_frames > 0 else 0:.1f}%)")
-        print(f"  非共享重复数: {len(duplicates_found)}")
+        if verbose:
+            if duplicates_found:
+                print(f"⚠️  发现 {len(duplicates_found)} 处非共享区域重复:")
+                for seq_i, pos_i, seq_j, pos_j in duplicates_found[:5]:
+                    print(f"    序列 #{seq_i} 位置 {pos_i} 与 序列 #{seq_j} 位置 {pos_j} 重复")
+                if len(duplicates_found) > 5:
+                    print(f"    ... 还有 {len(duplicates_found) - 5} 处重复")
+            else:
+                print("✓ 非共享区域完全唯一")
+            total_shared = sum(len(pos_set) for pos_set in shared_positions.values())
+            seq_length = sequences[0].shape[0]
+            total_frames = len(sequences) * (seq_length - 1)
+            total_non_shared = total_frames - total_shared
+            print("\n统计信息:")
+            print(f"  总帧数: {total_frames}")
+            print(f"  共享帧数: {total_shared} ({(total_shared / total_frames * 100) if total_frames > 0 else 0:.1f}%)")
+            print(f"  非共享帧数: {total_non_shared} ({(total_non_shared / total_frames * 100) if total_frames > 0 else 0:.1f}%)")
+            print(f"  非共享重复数: {len(duplicates_found)}")
     
     def analyze_pattern_structure(self, sequence: np.ndarray) -> Dict:
         """
