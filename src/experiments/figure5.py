@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
-from functools import partial
+from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import math
-import os
 
 import matplotlib
 
@@ -57,23 +55,27 @@ def _create_progress_bar(total: int, *, enabled: bool, desc: str):
     return tqdm(total=total, desc=desc, leave=False, unit="cfg")
 
 
-def _resolve_worker_count(requested: Optional[int]) -> int:
+def _resolve_worker_count(requested: Optional[int], reserve_ratio: float = 0.25) -> int:
     """
     Translate user input into an actual worker count.
 
     Semantics:
     - None or <= 1 → run sequentially.
-    - -1 → use 75% of available CPUs (at least 1).
+    - -1 → use (1 - reserve_ratio) of available CPUs (default 75%, at least 1).
     - 0 → use all available CPUs.
     - N > 1 → use min(N, cpu_count).
+    
+    Args:
+        requested: Requested worker count
+        reserve_ratio: Ratio of CPUs to reserve for system (default 0.25 = 25%)
     """
 
     if requested is None or requested <= 1:
         return 1
 
-    total = os.cpu_count() or 1
+    total = cpu_count() or 1
     if requested == -1:
-        return max(1, math.floor(total * 0.75))
+        return max(1, int(total * (1 - reserve_ratio)))
     if requested == 0:
         return total
     if requested < -1:
@@ -81,28 +83,54 @@ def _resolve_worker_count(requested: Optional[int]) -> int:
     return max(1, min(requested, total))
 
 
-def _single_trial_evaluation(
-    params: Dict,
-    num_epochs: int,
-    noise_level: float,
-    v_only: bool,
-    with_repetition: bool,
-    repetition_position: Optional[int],
-    trial: int,
-) -> bool:
-    network = SequenceAttractorNetwork(**params)
+def _single_trial_task(trial_params: Dict) -> bool:
+    """
+    Single trial task function for parallel execution.
+    
+    Args:
+        trial_params: Dictionary containing all necessary parameters:
+            - params: Network parameters (N_v, N_h, T, eta, kappa)
+            - num_epochs: Number of training epochs
+            - noise_level: Noise level for robustness testing
+            - v_only: Whether to train only V weights
+            - with_repetition: Whether to use sequence with repetition
+            - repetition_position: Position for repetition (if with_repetition=True)
+            - seed: Random seed for this trial
+    
+    Returns:
+        bool: True if robustness test passed (robustness > 0.5), False otherwise
+    """
+    params = trial_params["params"]
+    num_epochs = trial_params["num_epochs"]
+    noise_level = trial_params["noise_level"]
+    v_only = trial_params["v_only"]
+    with_repetition = trial_params["with_repetition"]
+    repetition_position = trial_params.get("repetition_position")
+    seed = trial_params["seed"]
+    
+    # Each trial already has a unique seed (trial index), so we can use it directly
+    # No need to use process ID since each task has a unique seed parameter
+    # This ensures reproducibility and avoids conflicts in parallel execution
+    trial_seed = seed
+    
+    # Create network with seed for weight initialization
+    # Use a different seed offset for weight initialization to avoid conflicts
+    weight_init_seed = (trial_seed * 1000 + 10000) % (2**31)
+    network = SequenceAttractorNetwork(**params, seed=weight_init_seed)
 
     if with_repetition:
+        # Use trial_seed for sequence generation to ensure consistency
         x_train = _generate_sequence_with_single_repetition(
             T=params["T"],
             N_v=params["N_v"],
-            seed=trial,
+            seed=trial_seed,
             repeat_pos=repetition_position,
         )
         train_seed = None
     else:
         x_train = None
-        train_seed = trial
+        # Use trial_seed for training sequence generation
+        train_seed = trial_seed
 
     network.train(
         x=x_train,
@@ -111,10 +139,12 @@ def _single_trial_evaluation(
         seed=train_seed,
         V_only=v_only,
     )
+    # Pass seed to test_robustness for reproducibility in parallel execution
     robustness = network.test_robustness(
         noise_levels=np.array([noise_level]),
         num_trials=1,
         verbose=False,
+        base_seed=trial_seed,
     )
     return bool(robustness[0] > 0.5)
 
@@ -129,20 +159,33 @@ def _run_trials(
     repetition_position: Optional[int] = None,
     show_trial_progress: bool = False,
 ) -> float:
+    """
+    Run multiple trials in parallel or sequentially.
+    
+    Uses multiprocessing.Pool with imap() for better performance than ProcessPoolExecutor.
+    Pre-computes all trial parameters to avoid serialization overhead.
+    """
     noise_level = cfg.noise_level(params["N_v"])
-    trial_fn = partial(
-        _single_trial_evaluation,
-        params,
-        cfg.num_epochs,
-        noise_level,
-        v_only,
-        with_repetition,
-        repetition_position,
-    )
+    
+    # Pre-compute all trial parameters to avoid serialization overhead
+    trial_params_list = []
+    for trial in range(cfg.num_trials):
+        trial_params = {
+            "params": params,
+            "num_epochs": cfg.num_epochs,
+            "noise_level": noise_level,
+            "v_only": v_only,
+            "with_repetition": with_repetition,
+            "seed": trial,
+        }
+        if repetition_position is not None:
+            trial_params["repetition_position"] = repetition_position
+        trial_params_list.append(trial_params)
 
     if num_workers <= 1:
+        # Sequential execution
         success_count = 0
-        trial_iter = range(cfg.num_trials)
+        trial_iter = trial_params_list
         if show_trial_progress and tqdm is not None:
             trial_iter = tqdm(
                 trial_iter,
@@ -151,16 +194,18 @@ def _run_trials(
                 leave=False,
                 ncols=80,
             )
-        for trial in trial_iter:
-            if trial_fn(trial):
+        for trial_params in trial_iter:
+            if _single_trial_task(trial_params):
                 success_count += 1
         return success_count / cfg.num_trials
 
-    # 限制worker数量不超过trials数量
+    # Parallel execution using multiprocessing.Pool
+    # Limit worker count to not exceed number of trials
     num_workers = min(num_workers, cfg.num_trials)
 
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        trial_iter = executor.map(trial_fn, range(cfg.num_trials))
+    with Pool(processes=num_workers) as pool:
+        # Use imap() for immediate processing and better progress tracking
+        trial_iter = pool.imap(_single_trial_task, trial_params_list)
         if show_trial_progress and tqdm is not None:
             trial_iter = tqdm(
                 trial_iter,
@@ -169,8 +214,8 @@ def _run_trials(
                 leave=False,
                 ncols=80,
             )
-        successes = list(trial_iter)
-        success_count = sum(1 for result in successes if result)
+        results = list(trial_iter)
+        success_count = sum(1 for result in results if result)
 
     return success_count / cfg.num_trials
 

@@ -18,7 +18,7 @@ class SequenceAttractorNetwork:
     """序列吸引子循环神经网络（基础类）"""
     
     def __init__(self, N_v: int, T: int, N_h: Optional[int] = None, 
-                 eta: float = 0.001, kappa: float = 1):
+                 eta: float = 0.001, kappa: float = 1, seed: Optional[int] = None):
         """
         初始化网络
         
@@ -28,6 +28,7 @@ class SequenceAttractorNetwork:
             N_h: 隐藏神经元数量（默认为3*(T-1)）
             eta: 学习率
             kappa: 鲁棒性参数（margin）
+            seed: 随机种子（用于权重初始化，可选）
         """
         self.N_v = N_v
         self.T = T
@@ -35,10 +36,14 @@ class SequenceAttractorNetwork:
         self.eta = eta
         self.kappa = kappa
         
-        # 初始化权重矩阵
-        self.U = np.random.randn(self.N_h, N_v) * 1e-6
-        self.V = np.random.randn(N_v, self.N_h) * 1e-6
-        self.P = np.random.randn(self.N_h, N_v) * 1e-6
+        # 初始化权重矩阵（使用种子确保可重复性）
+        if seed is not None:
+            rng = np.random.RandomState(seed)
+        else:
+            rng = np.random
+        self.U = rng.randn(self.N_h, N_v) * 1e-6
+        self.V = rng.randn(N_v, self.N_h) * 1e-6
+        self.P = rng.randn(self.N_h, N_v) * 1e-6
         
         # 训练历史
         self.mu_history = []
@@ -55,16 +60,20 @@ class SequenceAttractorNetwork:
         返回:
             x: T x N_v 的二值序列
         """
+        # Use independent RandomState to avoid affecting global random state
+        # This is important for parallel execution
         if seed is not None:
-            np.random.seed(seed)
+            rng = np.random.RandomState(seed)
+        else:
+            rng = np.random
             
-        x = np.sign(np.random.randn(self.T, self.N_v))
+        x = np.sign(rng.randn(self.T, self.N_v))
         x[x == 0] = 1
         
         # 确保序列中没有重复（除了首尾）
         for t in range(1, self.T - 1):
             while np.any(np.all(x[t, :] == x[:t, :], axis=1)):
-                x[t, :] = np.sign(np.random.randn(self.N_v))
+                x[t, :] = np.sign(rng.randn(self.N_v))
                 x[t, x[t, :] == 0] = 1
         
         x[self.T - 1, :] = x[0, :]  # 周期性
@@ -204,7 +213,8 @@ class SequenceAttractorNetwork:
     
     def test_recall_success_rate(self, num_trials: int = 50, 
                                 noise_level: float = 0.0,
-                                verbose: bool = True) -> Dict:
+                                verbose: bool = True,
+                                base_seed: Optional[int] = None) -> Dict:
         """
         测试序列回放成功率
         
@@ -212,6 +222,7 @@ class SequenceAttractorNetwork:
             num_trials: 测试次数
             noise_level: 噪声水平（默认0.0表示无噪声）
             verbose: 是否打印信息
+            base_seed: 基础随机种子（用于并行执行时的可重复性）
             
         返回:
             包含成功率和详细统计的字典
@@ -223,6 +234,10 @@ class SequenceAttractorNetwork:
         convergence_steps = []
         
         for trial in range(num_trials):
+            # Set seed for each trial to ensure reproducibility in parallel execution
+            if base_seed is not None:
+                np.random.seed(base_seed + trial)
+            
             # 1. 生成初始状态（加噪或无噪）
             xi_test = self.training_sequence[0, :].copy().reshape(-1, 1)
             
@@ -273,7 +288,8 @@ class SequenceAttractorNetwork:
     
     def test_robustness(self, noise_levels: np.ndarray, 
                     num_trials: int = 50, 
-                    verbose: bool = True) -> np.ndarray:
+                    verbose: bool = True,
+                    base_seed: Optional[int] = None) -> np.ndarray:
         """
         测试噪声鲁棒性
         
@@ -281,6 +297,7 @@ class SequenceAttractorNetwork:
             noise_levels: 噪声水平数组
             num_trials: 每个噪声水平的测试次数
             verbose: 是否打印进度
+            base_seed: 基础随机种子（用于并行执行时的可重复性）
             
         返回:
             成功率数组
@@ -288,10 +305,13 @@ class SequenceAttractorNetwork:
         robustness_scores = np.zeros(len(noise_levels))
         
         for i, noise_level in enumerate(noise_levels):
+            # Use different seed offset for each noise level
+            seed_offset = (base_seed + i * 1000) if base_seed is not None else None
             result = self.test_recall_success_rate(
                 num_trials=num_trials,
                 noise_level=noise_level,
-                verbose=verbose
+                verbose=verbose,
+                base_seed=seed_offset
             )
             robustness_scores[i] = result['success_rate']
         
