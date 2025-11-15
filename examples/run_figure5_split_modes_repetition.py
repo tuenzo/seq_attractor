@@ -20,7 +20,7 @@ def main() -> None:
         noise_num=10,
         num_epochs=500,
         T_values=np.linspace(10, 140, 14, dtype=int),
-        N_h_values=np.linspace(100, 1000, 11, dtype=int),
+        N_h_values=np.linspace(100, 1000, 10, dtype=int),
     )
     run_figure5_experiments_split_modes(
         config=cfg,
