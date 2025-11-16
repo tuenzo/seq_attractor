@@ -107,7 +107,6 @@ def test_figure5_trial_task():
         "num_sequences": 3,  # 使用3个序列
         "with_shared_patterns": False,
         "shared_pattern_positions": None,
-        "with_repetition": False,
         "seed": 42,
     }
     

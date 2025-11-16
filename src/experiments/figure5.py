@@ -21,7 +21,6 @@ try:
 except Exception:  # pragma: no cover - tqdm is optional at runtime
     tqdm = None
 
-from ..core import SequenceAttractorNetwork
 from ..models.pattern_repetition import PatternRepetitionNetwork
 
 
@@ -103,8 +102,6 @@ def _single_trial_task(trial_params: Dict) -> bool:
             - num_epochs: Number of training epochs
             - noise_level: Noise level for robustness testing
             - v_only: Whether to train only V weights
-            - with_repetition: Whether to use sequence with repetition (legacy)
-            - repetition_position: Position for repetition (if with_repetition=True) (legacy)
             - num_sequences: Number of sequences to learn (None means default 2)
             - with_shared_patterns: Whether to use shared patterns between sequences
             - shared_pattern_positions: Shared pattern positions
@@ -124,10 +121,6 @@ def _single_trial_task(trial_params: Dict) -> bool:
     with_shared_patterns = trial_params.get("with_shared_patterns", False)
     shared_pattern_positions = trial_params.get("shared_pattern_positions")
     
-    # 向后兼容：支持旧的with_repetition参数
-    with_repetition = trial_params.get("with_repetition", False)
-    repetition_position = trial_params.get("repetition_position")
-    
     # Each trial already has a unique seed (trial index), so we can use it directly
     # No need to use process ID since each task has a unique seed parameter
     # This ensures reproducibility and avoids conflicts in parallel execution
@@ -137,226 +130,184 @@ def _single_trial_task(trial_params: Dict) -> bool:
     # Use a different seed offset for weight initialization to avoid conflicts
     weight_init_seed = (trial_seed * 1000 + 10000) % (2**31)
     
-    # 判断是否使用多序列学习
-    # 如果明确指定了序列数量且>1，或者启用了共享模式，则使用多序列
-    # 如果num_sequences为None且没有启用with_repetition，默认使用多序列（2个序列）
-    use_multi_sequence = (
-        (num_sequences is not None and num_sequences > 1) or
-        with_shared_patterns or
-        (num_sequences is None and not with_repetition)
+    # 使用多序列学习（PatternRepetitionNetwork）
+    network = PatternRepetitionNetwork(**params, seed=weight_init_seed)
+    
+    # 确定序列数量（如果为None，默认使用2个序列）
+    actual_num_sequences = num_sequences if num_sequences is not None else 2
+    
+    # 生成多序列（直接使用已创建的 network 实例）
+    if not with_shared_patterns:
+        # 不使用共享模式，生成多个唯一序列
+        x_train_list = network.generate_multiple_sequences(
+            num_sequences=actual_num_sequences,
+            seeds=[trial_seed + i for i in range(actual_num_sequences)],
+            T=params["T"],
+            ensure_unique_across=True,
+            verbose=False,
+        )
+    else:
+        # 使用共享模式
+        T = params["T"]
+        
+        # 确定共享模式位置
+        if shared_pattern_positions is None:
+            # 默认：两个序列，中间位置有一个模式重复
+            if actual_num_sequences < 2:
+                actual_num_sequences = 2
+            mid_pos = T // 2
+            start_pos = mid_pos
+            end_pos = mid_pos
+            
+            # 构建共享组：序列0和1共享中间模式
+            shared_groups = [[0, 1]] if actual_num_sequences >= 2 else []
+            patterns_per_group = [1]
+            positions_per_group = [
+                [
+                    [(start_pos, end_pos)],  # 序列0的位置
+                    [(start_pos, end_pos)],  # 序列1的位置
+                ]
+            ]
+            
+            # 如果序列数大于2，其他序列不共享
+            if actual_num_sequences > 2:
+                # 为其他序列生成唯一序列
+                all_sequences = []
+                # 先为前两个序列生成共享模式
+                shared_seqs = network.generate_sequences_with_custom_patterns(
+                    num_sequences=2,
+                    shared_groups=shared_groups,
+                    patterns_per_group=patterns_per_group,
+                    positions_per_group=positions_per_group,
+                    seeds=[trial_seed, trial_seed + 1],
+                    T=T,
+                    ensure_unique_non_shared=True,
+                    verbose=False,
+                )
+                all_sequences.extend(shared_seqs)
+                
+                # 为其他序列生成唯一序列
+                for i in range(2, actual_num_sequences):
+                    unique_seqs = network.generate_multiple_sequences(
+                        num_sequences=1,
+                        seeds=[trial_seed + i],
+                        T=T,
+                        ensure_unique_across=True,
+                        verbose=False,
+                    )
+                    all_sequences.extend(unique_seqs)
+                
+                x_train_list = all_sequences
+            else:
+                # 正好两个序列，使用共享模式
+                x_train_list = network.generate_sequences_with_custom_patterns(
+                    num_sequences=actual_num_sequences,
+                    shared_groups=shared_groups,
+                    patterns_per_group=patterns_per_group,
+                    positions_per_group=positions_per_group,
+                    seeds=[trial_seed + i for i in range(actual_num_sequences)],
+                    T=T,
+                    ensure_unique_non_shared=True,
+                    verbose=False,
+                )
+        else:
+            # 使用用户指定的共享模式位置
+            # 需要将用户格式转换为generate_sequences_with_custom_patterns需要的格式
+            # 用户格式: [[(start1, end1), ...], [(start2, end2), ...], ...]
+            # 需要转换为: shared_groups, patterns_per_group, positions_per_group
+            
+            # 简化处理：假设所有序列共享相同的模式位置（可以后续扩展）
+            # 这里我们假设用户想要所有序列对之间共享模式
+            # 为了简化，我们假设前两个序列共享第一个模式组
+            if actual_num_sequences < 2:
+                actual_num_sequences = 2
+            
+            # 解析共享模式位置
+            # 假设shared_pattern_positions格式为每个序列的模式位置列表
+            if len(shared_pattern_positions) < 2:
+                # 如果只提供了一个序列的位置，复制给第二个序列
+                shared_pattern_positions = [
+                    shared_pattern_positions[0],
+                    shared_pattern_positions[0] if len(shared_pattern_positions) > 0 else [(T // 2, T // 2)],
+                ]
+            
+            # 构建共享组配置
+            shared_groups = [[0, 1]]
+            patterns_per_group = [len(shared_pattern_positions[0])]
+            positions_per_group = [
+                [
+                    shared_pattern_positions[0],  # 序列0的位置
+                    shared_pattern_positions[1] if len(shared_pattern_positions) > 1 else shared_pattern_positions[0],  # 序列1的位置
+                ]
+            ]
+            
+            # 如果序列数大于2，其他序列不共享
+            if actual_num_sequences > 2:
+                all_sequences = []
+                shared_seqs = network.generate_sequences_with_custom_patterns(
+                    num_sequences=2,
+                    shared_groups=shared_groups,
+                    patterns_per_group=patterns_per_group,
+                    positions_per_group=positions_per_group,
+                    seeds=[trial_seed, trial_seed + 1],
+                    T=T,
+                    ensure_unique_non_shared=True,
+                    verbose=False,
+                )
+                all_sequences.extend(shared_seqs)
+                
+                for i in range(2, actual_num_sequences):
+                    unique_seqs = network.generate_multiple_sequences(
+                        num_sequences=1,
+                        seeds=[trial_seed + i],
+                        T=T,
+                        ensure_unique_across=True,
+                        verbose=False,
+                    )
+                    all_sequences.extend(unique_seqs)
+                
+                x_train_list = all_sequences
+            else:
+                x_train_list = network.generate_sequences_with_custom_patterns(
+                    num_sequences=actual_num_sequences,
+                    shared_groups=shared_groups,
+                    patterns_per_group=patterns_per_group,
+                    positions_per_group=positions_per_group,
+                    seeds=[trial_seed + i for i in range(actual_num_sequences)],
+                    T=T,
+                    ensure_unique_non_shared=True,
+                    verbose=False,
+                )
+    
+    # 训练多序列
+    network.train(
+        x=x_train_list,
+        num_epochs=num_epochs,
+        verbose=False,
+        V_only=v_only,
+        interleaved=True,
     )
     
-    if use_multi_sequence:
-        # 使用多序列学习（需要MemorySequenceAttractorNetwork或PatternRepetitionNetwork）
-        network = PatternRepetitionNetwork(**params, seed=weight_init_seed)
-        
-        # 确定序列数量（如果为None，默认使用2个序列）
-        actual_num_sequences = num_sequences if num_sequences is not None else 2
-        
-        # 生成多序列（直接使用已创建的 network 实例）
-        if not with_shared_patterns:
-            # 不使用共享模式，生成多个唯一序列
-            x_train_list = network.generate_multiple_sequences(
-                num_sequences=actual_num_sequences,
-                seeds=[trial_seed + i for i in range(actual_num_sequences)],
-                T=params["T"],
-                ensure_unique_across=True,
-                verbose=False,
-            )
-        else:
-            # 使用共享模式
-            T = params["T"]
-            
-            # 确定共享模式位置
-            if shared_pattern_positions is None:
-                # 默认：两个序列，中间位置有一个模式重复
-                if actual_num_sequences < 2:
-                    actual_num_sequences = 2
-                mid_pos = T // 2
-                start_pos = mid_pos
-                end_pos = mid_pos
-                
-                # 构建共享组：序列0和1共享中间模式
-                shared_groups = [[0, 1]] if actual_num_sequences >= 2 else []
-                patterns_per_group = [1]
-                positions_per_group = [
-                    [
-                        [(start_pos, end_pos)],  # 序列0的位置
-                        [(start_pos, end_pos)],  # 序列1的位置
-                    ]
-                ]
-                
-                # 如果序列数大于2，其他序列不共享
-                if actual_num_sequences > 2:
-                    # 为其他序列生成唯一序列
-                    all_sequences = []
-                    # 先为前两个序列生成共享模式
-                    shared_seqs = network.generate_sequences_with_custom_patterns(
-                        num_sequences=2,
-                        shared_groups=shared_groups,
-                        patterns_per_group=patterns_per_group,
-                        positions_per_group=positions_per_group,
-                        seeds=[trial_seed, trial_seed + 1],
-                        T=T,
-                        ensure_unique_non_shared=True,
-                        verbose=False,
-                    )
-                    all_sequences.extend(shared_seqs)
-                    
-                    # 为其他序列生成唯一序列
-                    for i in range(2, actual_num_sequences):
-                        unique_seqs = network.generate_multiple_sequences(
-                            num_sequences=1,
-                            seeds=[trial_seed + i],
-                            T=T,
-                            ensure_unique_across=True,
-                            verbose=False,
-                        )
-                        all_sequences.extend(unique_seqs)
-                    
-                    x_train_list = all_sequences
-                else:
-                    # 正好两个序列，使用共享模式
-                    x_train_list = network.generate_sequences_with_custom_patterns(
-                        num_sequences=actual_num_sequences,
-                        shared_groups=shared_groups,
-                        patterns_per_group=patterns_per_group,
-                        positions_per_group=positions_per_group,
-                        seeds=[trial_seed + i for i in range(actual_num_sequences)],
-                        T=T,
-                        ensure_unique_non_shared=True,
-                        verbose=False,
-                    )
-            else:
-                # 使用用户指定的共享模式位置
-                # 需要将用户格式转换为generate_sequences_with_custom_patterns需要的格式
-                # 用户格式: [[(start1, end1), ...], [(start2, end2), ...], ...]
-                # 需要转换为: shared_groups, patterns_per_group, positions_per_group
-                
-                # 简化处理：假设所有序列共享相同的模式位置（可以后续扩展）
-                # 这里我们假设用户想要所有序列对之间共享模式
-                # 为了简化，我们假设前两个序列共享第一个模式组
-                if actual_num_sequences < 2:
-                    actual_num_sequences = 2
-                
-                # 解析共享模式位置
-                # 假设shared_pattern_positions格式为每个序列的模式位置列表
-                if len(shared_pattern_positions) < 2:
-                    # 如果只提供了一个序列的位置，复制给第二个序列
-                    shared_pattern_positions = [
-                        shared_pattern_positions[0],
-                        shared_pattern_positions[0] if len(shared_pattern_positions) > 0 else [(T // 2, T // 2)],
-                    ]
-                
-                # 构建共享组配置
-                shared_groups = [[0, 1]]
-                patterns_per_group = [len(shared_pattern_positions[0])]
-                positions_per_group = [
-                    [
-                        shared_pattern_positions[0],  # 序列0的位置
-                        shared_pattern_positions[1] if len(shared_pattern_positions) > 1 else shared_pattern_positions[0],  # 序列1的位置
-                    ]
-                ]
-                
-                # 如果序列数大于2，其他序列不共享
-                if actual_num_sequences > 2:
-                    all_sequences = []
-                    shared_seqs = network.generate_sequences_with_custom_patterns(
-                        num_sequences=2,
-                        shared_groups=shared_groups,
-                        patterns_per_group=patterns_per_group,
-                        positions_per_group=positions_per_group,
-                        seeds=[trial_seed, trial_seed + 1],
-                        T=T,
-                        ensure_unique_non_shared=True,
-                        verbose=False,
-                    )
-                    all_sequences.extend(shared_seqs)
-                    
-                    for i in range(2, actual_num_sequences):
-                        unique_seqs = network.generate_multiple_sequences(
-                            num_sequences=1,
-                            seeds=[trial_seed + i],
-                            T=T,
-                            ensure_unique_across=True,
-                            verbose=False,
-                        )
-                        all_sequences.extend(unique_seqs)
-                    
-                    x_train_list = all_sequences
-                else:
-                    x_train_list = network.generate_sequences_with_custom_patterns(
-                        num_sequences=actual_num_sequences,
-                        shared_groups=shared_groups,
-                        patterns_per_group=patterns_per_group,
-                        positions_per_group=positions_per_group,
-                        seeds=[trial_seed + i for i in range(actual_num_sequences)],
-                        T=T,
-                        ensure_unique_non_shared=True,
-                        verbose=False,
-                    )
-        
-        # 训练多序列
-        network.train(
-            x=x_train_list,
-            num_epochs=num_epochs,
-            verbose=False,
-            V_only=v_only,
-            interleaved=True,
-        )
-        
-        # 测试所有序列的鲁棒性，计算平均成功率
-        # 分别测试每个序列，然后计算总成功率
-        num_learned_sequences = len(network.training_sequences)
-        if num_learned_sequences == 0:
-            # 如果没有序列，返回False
-            return False
-        
-        success_rates = []
-        for seq_idx in range(num_learned_sequences):
-            robustness = network.test_robustness(
-                noise_levels=np.array([noise_level]),
-                num_trials=1,
-                verbose=False,
-                sequence_index=seq_idx,
-            )
-            success_rates.append(robustness[0])
-        
-        # 计算所有序列的平均成功率
-        avg_success_rate = np.mean(success_rates)
-        robustness = np.array([avg_success_rate])
-    else:
-        # 使用单序列学习（向后兼容）
-        network = SequenceAttractorNetwork(**params, seed=weight_init_seed)
-
-        if with_repetition:
-            # Use trial_seed for sequence generation to ensure consistency
-            x_train = _generate_sequence_with_single_repetition(
-                T=params["T"],
-                N_v=params["N_v"],
-                seed=trial_seed,
-                repeat_pos=repetition_position,
-            )
-            train_seed = None
-        else:
-            x_train = None
-            # Use trial_seed for training sequence generation
-            train_seed = trial_seed
-
-        network.train(
-            x=x_train,
-            num_epochs=num_epochs,
-            verbose=False,
-            seed=train_seed,
-            V_only=v_only,
-        )
-        # Pass seed to test_robustness for reproducibility in parallel execution
+    # 测试所有序列的鲁棒性，计算平均成功率
+    # 分别测试每个序列，然后计算总成功率
+    num_learned_sequences = len(network.training_sequences)
+    if num_learned_sequences == 0:
+        # 如果没有序列，返回False
+        return False
+    
+    success_rates = []
+    for seq_idx in range(num_learned_sequences):
         robustness = network.test_robustness(
             noise_levels=np.array([noise_level]),
             num_trials=1,
             verbose=False,
-            base_seed=trial_seed,
+            sequence_index=seq_idx,
         )
+        success_rates.append(robustness[0])
+    
+    # 计算所有序列的平均成功率
+    avg_success_rate = np.mean(success_rates)
+    robustness = np.array([avg_success_rate])
     
     return bool(robustness[0] > 0.5)
 
@@ -367,8 +318,6 @@ def _run_trials(
     cfg: Figure5Config,
     v_only: bool,
     num_workers: int,
-    with_repetition: bool = False,
-    repetition_position: Optional[int] = None,
     show_trial_progress: bool = False,
     num_sequences: Optional[int] = None,
     with_shared_patterns: bool = False,
@@ -385,8 +334,6 @@ def _run_trials(
         cfg: Figure5Config configuration
         v_only: Whether to train only V weights
         num_workers: Number of parallel workers
-        with_repetition: Whether to use sequence with repetition (legacy)
-        repetition_position: Position for repetition (legacy)
         show_trial_progress: Whether to show trial progress
         num_sequences: Number of sequences to learn (None means use cfg default)
         with_shared_patterns: Whether to use shared patterns between sequences
@@ -396,7 +343,7 @@ def _run_trials(
     
     # 确定序列数量（优先使用参数，否则使用配置）
     actual_num_sequences = num_sequences if num_sequences is not None else cfg.get_num_sequences()
-    actual_with_shared_patterns = with_shared_patterns if not with_repetition else False
+    actual_with_shared_patterns = with_shared_patterns
     actual_shared_pattern_positions = shared_pattern_positions if actual_with_shared_patterns else None
     
     # Pre-compute all trial parameters to avoid serialization overhead
@@ -407,14 +354,11 @@ def _run_trials(
             "num_epochs": cfg.num_epochs,
             "noise_level": noise_level,
             "v_only": v_only,
-            "with_repetition": with_repetition,
             "seed": trial,
             "num_sequences": actual_num_sequences,
             "with_shared_patterns": actual_with_shared_patterns,
             "shared_pattern_positions": actual_shared_pattern_positions,
         }
-        if repetition_position is not None:
-            trial_params["repetition_position"] = repetition_position
         trial_params_list.append(trial_params)
 
     if num_workers <= 1:
@@ -581,8 +525,22 @@ def run_figure5_experiments(
     progress_callback: Optional[Callable[[str, int, int, int], None]] = None,
     use_progress: bool = False,
     workers: Optional[int] = None,
+    base_params_a: Optional[Dict] = None,
+    base_params_b: Optional[Dict] = None,
 ) -> Tuple[List[Dict], List[Dict], List[Dict], List[Dict], Path]:
-    """Execute the Figure 5 experiments with optional multiprocessing."""
+    """Execute the Figure 5 experiments with optional multiprocessing.
+    
+    Args:
+        config: Configuration object for experiments
+        output_dir: Output directory for results
+        create_timestamp_dir: Whether to create timestamped subdirectory
+        show_images: Whether to display plots
+        progress_callback: Optional callback for progress updates
+        use_progress: Whether to show tqdm progress bars
+        workers: Number of parallel workers (None/<=1 for sequential, -1 for auto, 0 for all CPUs, N for N workers)
+        base_params_a: Base parameters for experiment (a) - scanning T (default: {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0})
+        base_params_b: Base parameters for experiment (b) - scanning N_h (default: {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0})
+    """
 
     cfg = config or Figure5Config()
     output_path = _ensure_output_dir(output_dir, create_timestamp=create_timestamp_dir)
@@ -592,8 +550,10 @@ def run_figure5_experiments(
         if progress_callback is not None:
             progress_callback(stage, current, total, value)
 
-    base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0}
-    base_params_b = {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0}
+    if base_params_a is None:
+        base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0}
+    if base_params_b is None:
+        base_params_b = {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0}
 
     results_v_only_a = _run_single_configuration(
         {**base_params_a},
@@ -708,8 +668,6 @@ def _run_split_configuration(
     varying_values: Sequence[int],
     *,
     cfg: Figure5Config,
-    with_repetition: bool,
-    repetition_position: Optional[int],
     use_progress: bool = False,
     progress_label: Optional[str] = None,
     num_workers: int = 1,
@@ -733,8 +691,6 @@ def _run_split_configuration(
                 cfg=cfg,
                 v_only=True,
                 num_workers=num_workers,
-                with_repetition=with_repetition,
-                repetition_position=repetition_position,
                 show_trial_progress=use_progress,
                 num_sequences=num_sequences,
                 with_shared_patterns=with_shared_patterns,
@@ -745,8 +701,6 @@ def _run_split_configuration(
                 cfg=cfg,
                 v_only=False,
                 num_workers=num_workers,
-                with_repetition=with_repetition,
-                repetition_position=repetition_position,
                 show_trial_progress=use_progress,
                 num_sequences=num_sequences,
                 with_shared_patterns=with_shared_patterns,
@@ -757,7 +711,6 @@ def _run_split_configuration(
                 varying_key: params[varying_key],
                 "recall_accuracy": 0.0,  # placeholder to overwrite below
                 "N_v": params["N_v"],
-                "with_repetition": with_repetition,
                 "num_sequences": num_sequences if num_sequences is not None else cfg.get_num_sequences(),
                 "with_shared_patterns": with_shared_patterns,
             }
@@ -778,41 +731,19 @@ def _run_split_configuration(
 
     return results_v_only, results_uv
 
-def _generate_sequence_with_single_repetition(T: int, N_v: int, seed: int, repeat_pos: Optional[int] = None) -> np.ndarray:
-    """
-    生成一个基础随机序列，并在 repeat_pos 位置引入单步重复（复制首帧），最后一帧仍等于首帧。
-    """
-    rng = np.random.RandomState(seed)
-    x = np.sign(rng.randn(T, N_v))
-    x[x == 0] = 1
-    # 确保中间没有与首帧重复（简化保证唯一）
-    for t in range(1, T - 1):
-        while np.all(x[t, :] == x[0, :]):
-            x[t, :] = np.sign(rng.randn(N_v))
-            x[t, x[t, :] == 0] = 1
-    # 应用单步重复
-    pos = repeat_pos if (repeat_pos is not None and 0 <= repeat_pos < T - 1) else (T // 2)
-    if pos == T - 1:
-        pos = T // 2
-    x[pos, :] = x[0, :]
-    # 闭环
-    x[T - 1, :] = x[0, :]
-    return x
-
-
 def run_figure5_experiments_split_modes(
     *,
     config: Figure5Config | None = None,
     output_dir: Optional[Path] = None,
     create_timestamp_dir: bool = True,
     show_images: bool = False,
-    with_repetition: bool = False,
-    repetition_position: Optional[int] = None,
     use_progress: bool = False,
     workers: Optional[int] = None,
     num_sequences: Optional[int] = None,
     with_shared_patterns: bool = False,
     shared_pattern_positions: Optional[List[List[Tuple[int, int]]]] = None,
+    base_params_a: Optional[Dict] = None,
+    base_params_b: Optional[Dict] = None,
 ) -> Tuple[List[Dict], List[Dict], List[Dict], List[Dict], Path]:
     """
     拆分模式对比：
@@ -820,12 +751,12 @@ def run_figure5_experiments_split_modes(
     - 图(b)：固定 T=70，扫描 N_h，比较仅训练 V 与训练 U+V
     
     可选参数：
-    - with_repetition: 是否在训练序列中引入单步重复（legacy，向后兼容）
-    - repetition_position: 重复位置（legacy）
     - num_sequences: 序列数量（None表示使用config默认值2）
     - with_shared_patterns: 是否使用共享模式
     - shared_pattern_positions: 共享模式位置（None表示默认中间位置）
     - use_progress: 是否显示 tqdm 进度条
+    - base_params_a: Base parameters for experiment (a) - scanning T (default: {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0})
+    - base_params_b: Base parameters for experiment (b) - scanning N_h (default: {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0})
     
     返回：(results_v_only_T_scan, results_uv_T_scan, results_v_only_Nh_scan, results_uv_Nh_scan, output_path)
     """
@@ -837,19 +768,22 @@ def run_figure5_experiments_split_modes(
     # 确定多序列参数（优先使用函数参数，否则使用配置）
     # 如果函数参数和配置都为None，默认使用2个序列
     actual_num_sequences = num_sequences if num_sequences is not None else (cfg.num_sequences if cfg.num_sequences is not None else 2)
-    actual_with_shared_patterns = with_shared_patterns if not with_repetition else cfg.with_shared_patterns
-    actual_shared_pattern_positions = shared_pattern_positions if shared_pattern_positions is not None else cfg.shared_pattern_positions
+    actual_with_shared_patterns = with_shared_patterns
+    # 如果 with_shared_patterns=True 且 shared_pattern_positions=None，保持 None
+    # 让 _single_trial_task 中的逻辑处理默认中间位置
+    # 只有当用户明确提供了 shared_pattern_positions 时才使用它
+    actual_shared_pattern_positions = shared_pattern_positions
 
-    base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0}
-    base_params_b = {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0}
+    if base_params_a is None:
+        base_params_a = {"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0}
+    if base_params_b is None:
+        base_params_b = {"N_v": 100, "T": 70, "eta": 0.001, "kappa": 1.0}
 
     results_v_only_T_scan, results_uv_T_scan = _run_split_configuration(
         base_params_a,
         "T",
         cfg.T_values,
         cfg=cfg,
-        with_repetition=with_repetition,
-        repetition_position=repetition_position,
         use_progress=use_progress,
         progress_label="Split scan: T",
         num_workers=worker_count,
@@ -863,8 +797,6 @@ def run_figure5_experiments_split_modes(
         "N_h",
         cfg.N_h_values,
         cfg=cfg,
-        with_repetition=with_repetition,
-        repetition_position=repetition_position,
         use_progress=use_progress,
         progress_label="Split scan: N_h",
         num_workers=worker_count,
@@ -875,8 +807,6 @@ def run_figure5_experiments_split_modes(
 
     # 构建标题后缀
     title_parts = []
-    if with_repetition:
-        title_parts.append("with single-step repetition")
     if actual_with_shared_patterns:
         title_parts.append(f"with {actual_num_sequences if actual_num_sequences is not None else cfg.get_num_sequences()} sequences (shared patterns)")
     elif actual_num_sequences is not None and actual_num_sequences > 1:
@@ -885,9 +815,7 @@ def run_figure5_experiments_split_modes(
     
     # 构建文件名后缀
     filename_suffix = ""
-    if with_repetition:
-        filename_suffix = "_repetition"
-    elif actual_with_shared_patterns:
+    if actual_with_shared_patterns:
         filename_suffix = "_multi_shared"
     elif actual_num_sequences is not None and actual_num_sequences > 1:
         filename_suffix = f"_multi_{actual_num_sequences}"
@@ -917,7 +845,6 @@ def run_figure5_experiments_split_modes(
         f.write("Figure 5 拆分模式对比\n")
         f.write("=" * 80 + "\n\n")
         f.write(f"参数: num_trials={cfg.num_trials}, noise_num={cfg.noise_num}, num_epochs={cfg.num_epochs}\n")
-        f.write(f"with_repetition={with_repetition}, repetition_position={repetition_position}\n")
         f.write(f"num_sequences={actual_num_sequences if actual_num_sequences is not None else cfg.get_num_sequences()}\n")
         f.write(f"with_shared_patterns={actual_with_shared_patterns}\n")
         if actual_shared_pattern_positions:

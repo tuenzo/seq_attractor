@@ -23,7 +23,6 @@ def main() -> None:
         T_values=(10, 30, 50),
         N_h_values=(100, 325, 550),
         num_sequences=1,
-        with_shared_patterns=False,
     )
     run_figure5_experiments_split_modes(
         config=cfg1,
@@ -32,6 +31,7 @@ def main() -> None:
         show_images=False,
         use_progress=True,
         workers=1,
+        with_shared_patterns=False,
     )
 
 
@@ -46,7 +46,6 @@ def main() -> None:
         T_values=(10, 30, 50),
         N_h_values=(100, 325, 550),
         num_sequences=None,  # None表示默认2个序列
-        with_shared_patterns=False,
     )
     run_figure5_experiments_split_modes(
         config=cfg2,
@@ -55,6 +54,7 @@ def main() -> None:
         show_images=False,
         use_progress=True,
         workers=1,
+        with_shared_patterns=False,
     )
     
     # 示例3：多序列学习，启用共享模式（默认中间位置重复）
@@ -68,8 +68,6 @@ def main() -> None:
         T_values=(10, 30, 50),
         N_h_values=(100, 325, 550),
         num_sequences=2,  # 2个序列
-        with_shared_patterns=True,  # 启用共享模式
-        shared_pattern_positions=None,  # None表示默认中间位置
     )
     run_figure5_experiments_split_modes(
         config=cfg3,
@@ -78,6 +76,8 @@ def main() -> None:
         show_images=False,
         use_progress=True,
         workers=1,
+        with_shared_patterns=True,  # 启用共享模式
+        shared_pattern_positions=None,  # None表示默认中间位置
     )
     
     # 示例4：多序列学习，自定义共享模式位置
@@ -96,8 +96,6 @@ def main() -> None:
         T_values=(10, 30, 50),
         N_h_values=(100, 325, 550),
         num_sequences=2,
-        with_shared_patterns=True,
-        shared_pattern_positions=custom_positions,
     )
 
     run_figure5_experiments_split_modes(
@@ -107,6 +105,8 @@ def main() -> None:
         show_images=False,
         use_progress=True,
         workers=1,
+        with_shared_patterns=True,
+        shared_pattern_positions=custom_positions,
     )
     
     # 示例5：学习3个序列，前两个序列有共享模式
@@ -120,8 +120,6 @@ def main() -> None:
         T_values=(10, 30, 50),
         N_h_values=(100, 325, 550),
         num_sequences=3,
-        with_shared_patterns=True,
-        shared_pattern_positions=None,  # 默认：前两个序列中间位置有共享模式
     )
     run_figure5_experiments_split_modes(
         config=cfg5,
@@ -130,6 +128,8 @@ def main() -> None:
         show_images=False,
         use_progress=True,
         workers=1,
+        with_shared_patterns=True,
+        shared_pattern_positions=None,  # 默认：前两个序列中间位置有共享模式
     )
 
 

@@ -4,7 +4,6 @@ Simple CLI for running Figure 5 split-mode experiments.
 
 Examples:
     python scripts/sa_cli.py fig5-split --trials 100 --epochs 500 --show
-    python scripts/sa_cli.py fig5-split --with-repetition --repeat-pos 35 --show
 """
 
 import argparse
@@ -52,8 +51,6 @@ def main() -> None:
         parents=[common],
         help="Run split-mode Figure 5 (compare V-only vs U+V for both scans)",
     )
-    p_split.add_argument("--with-repetition", action="store_true", help="Inject single-step repetition into the sequence")
-    p_split.add_argument("--repeat-pos", type=int, default=None, help="Repetition position (default: middle)")
 
     args = parser.parse_args()
 
@@ -71,8 +68,6 @@ def main() -> None:
             output_dir=output_dir,
             create_timestamp_dir=not bool(args.no_timestamp),
             show_images=bool(args.show),
-            with_repetition=bool(args.with_repetition),
-            repetition_position=args.repeat_pos,
             use_progress=bool(args.progress),
             workers=int(args.workers),
         )

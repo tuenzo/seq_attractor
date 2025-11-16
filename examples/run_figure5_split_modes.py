@@ -26,7 +26,6 @@ def main() -> None:
         output_dir=None,
         create_timestamp_dir=True,
         show_images=True,
-        with_repetition=False,
         use_progress=True,
         workers=-1,
     )
