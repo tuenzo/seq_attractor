@@ -16,25 +16,26 @@ from src.experiments.figure5 import Figure5Config, run_figure5_experiments_split
 def main() -> None:
     start_time = time.time()
     print("\n" + "=" * 80)
-    print("实验内容：学习n个序列，前两个序列有共享模式")
+    print("实验内容：学习n个序列，前两个序列有/无共享模式")
     print("=" * 80)
     custom_positions = [
         [(4, 4)],  # 序列0的共享模式位置 (start, end)
         [(4, 4)],  # 序列1的共享模式位置 (start, end)
     ]
     cfg5 = Figure5Config(
-        num_trials=10,
+        num_trials=100,
         noise_num=10,
-        num_epochs=100,
+        num_epochs=500,
         T_values=np.linspace(5, 55, 6, dtype=int),
         N_h_values=np.linspace(100, 1000, 5, dtype=int),
         num_sequences=5,
     )
+    output_dir="figure5_results_local_exapmles"
     results = run_figure5_experiments_split_modes(
         config=cfg5,
-        base_params_a={"N_v": 100, "N_h": 500, "eta": 0.001, "kappa": 1.0},
-        base_params_b={"N_v": 100, "T": 25, "eta": 0.001, "kappa": 1.0},
-        output_dir="figure5_results_local_exapmles",
+        base_params_a={"N_v": 200, "N_h": 1000, "eta": 0.001, "kappa": 1.0},
+        base_params_b={"N_v": 200, "T": 25, "eta": 0.001, "kappa": 1.0},
+        output_dir=output_dir,
         create_timestamp_dir=True,
         show_images=False,
         use_progress=True,
@@ -44,7 +45,7 @@ def main() -> None:
     )
     time_cost = time.time() - start_time
     print("实验完成，实验耗时：%.2f 秒" % time_cost)
-    print("实验结果保存在 figure5_results 目录下，文件名以 timestamp 结尾")
+    print("实验结果保存在 %s 目录下，文件名以 timestamp 结尾" % output_dir)
 
 
 if __name__ == "__main__":
