@@ -851,7 +851,7 @@ def run_figure5_experiments_split_modes(
             f.write(f"shared_pattern_positions={actual_shared_pattern_positions}\n")
         f.write("\n")
 
-        f.write("(a) 扫描 T，比较 V-only vs U+V (N={base_params_a['N_v']}, M={base_params_a['N_h']})\n")
+        f.write("(a) 扫描 T，比较 V-only vs U+V (N=%s, M=%s)\n" % (base_params_a['N_v'], base_params_a['N_h']))
         f.write("-" * 80 + "\n")
         f.write(f"{'T':<8} {'V-only (%)':<15} {'U+V (%)':<15} {'Improvement':<15}\n")
         f.write("-" * 80 + "\n")
@@ -859,7 +859,7 @@ def run_figure5_experiments_split_modes(
             v_only = results_v_only_T_scan[idx]["recall_accuracy"] * 100
             uv = results_uv_T_scan[idx]["recall_accuracy"] * 100
             f.write(f"{T_value:<8} {v_only:<15.1f} {uv:<15.1f} {uv - v_only:+.1f}\n")
-        f.write("\n(b) 扫描 N_h，比较 V-only vs U+V (N={base_params_b['N_v']}, T={base_params_b['T']})\n")
+        f.write("\n(b) 扫描 N_h，比较 V-only vs U+V (N=%s, T=%s)\n" % (base_params_b['N_v'], base_params_b['T']))
         f.write("-" * 80 + "\n")
         f.write(f"{'M':<8} {'V-only (%)':<15} {'U+V (%)':<15} {'Improvement':<15}\n")
         f.write("-" * 80 + "\n")
