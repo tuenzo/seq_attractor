@@ -8,7 +8,6 @@ from .core import SequenceAttractorNetwork
 # 扩展模型
 from .models import (
     MemorySequenceAttractorNetwork,
-    MultiSequenceAttractorNetwork,
     IncrementalSequenceAttractorNetwork,
     PatternRepetitionNetwork
 )
@@ -33,7 +32,6 @@ __all__ = [
     'SequenceAttractorNetwork',
     # 扩展模型
     'MemorySequenceAttractorNetwork',
-    'MultiSequenceAttractorNetwork',
     'IncrementalSequenceAttractorNetwork',
     'PatternRepetitionNetwork',
     # 实验工具

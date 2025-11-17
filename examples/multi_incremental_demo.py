@@ -2,7 +2,7 @@
 多序列与增量训练综合示例
 ==================================
 
-该脚本演示统一的 `MemorySequenceAttractorNetwork` 在不同记忆策略下的用法：
+该脚本演示 `PatternRepetitionNetwork` 在不同记忆策略下的用法：
 1. 生成多个互不重复的训练序列，并进行跨序列重复性检查；
 2. 使用多序列模式一次性学习所有序列；
 3. 使用增量模式在单次训练中回顾已有记忆；
@@ -16,13 +16,13 @@
 import os
 import sys
 from dataclasses import dataclass
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence
 
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src import MemorySequenceAttractorNetwork  # noqa: E402  (路径插入需在导入前)
+from src import PatternRepetitionNetwork  # noqa: E402  (路径插入需在导入前)
 
 
 @dataclass(frozen=True)
@@ -38,31 +38,14 @@ class DemoConfig:
     num_epochs_multi: int = 200
     num_epochs_incremental_first: int = 180
     num_epochs_incremental_additional: int = 120
-    seeds: Tuple[int, ...] = (7, 19, 37)
+    seeds: List[int] = None
+
+    def __post_init__(self):
+        if self.seeds is None:
+            object.__setattr__(self, 'seeds', [7, 19, 37])
 
 
-def check_no_duplicate_frames(sequences: Sequence[np.ndarray]) -> List[Tuple[int, int, Tuple[int, ...]]]:
-    """
-    检查所有序列（忽略每序列的最后一帧）是否存在重复帧。
-
-    返回重复帧列表，元素格式为 (序列索引, 帧索引, 帧内容)。
-    若列表为空，表示所有帧唯一。
-    """
-    seen_frames: Dict[Tuple[int, ...], Tuple[int, int]] = {}
-    duplicates: List[Tuple[int, int, Tuple[int, ...]]] = []
-
-    for seq_idx, sequence in enumerate(sequences):
-        for frame_idx in range(sequence.shape[0] - 1):  # 忽略最后一帧（等于首帧）
-            frame_tuple = tuple(sequence[frame_idx].astype(int).tolist())
-            if frame_tuple in seen_frames:
-                duplicates.append((seq_idx, frame_idx, frame_tuple))
-            else:
-                seen_frames[frame_tuple] = (seq_idx, frame_idx)
-
-    return duplicates
-
-
-def summarize_recall_accuracy(network, sequence_count: int, title: str) -> None:
+def summarize_recall_accuracy(network: PatternRepetitionNetwork, sequence_count: int, title: str) -> None:
     """打印每个序列的回放准确率。"""
     print(f"\n[{title}] 回放准确率概览:")
     for idx in range(sequence_count):
@@ -73,9 +56,9 @@ def summarize_recall_accuracy(network, sequence_count: int, title: str) -> None:
         print(f"  序列 #{idx}: {status}，准确率 = {accuracy * 100:.1f}%")
 
 
-def build_network(cfg: DemoConfig) -> MemorySequenceAttractorNetwork:
-    """创建统一的记忆网络实例。"""
-    return MemorySequenceAttractorNetwork(
+def build_network(cfg: DemoConfig) -> PatternRepetitionNetwork:
+    """创建 PatternRepetitionNetwork 实例。"""
+    return PatternRepetitionNetwork(
         N_v=cfg.N_v,
         T=cfg.T,
         N_h=cfg.N_h,
@@ -84,7 +67,7 @@ def build_network(cfg: DemoConfig) -> MemorySequenceAttractorNetwork:
     )
 
 
-def run_multi_sequence_training(cfg: DemoConfig, sequences: Sequence[np.ndarray]) -> MemorySequenceAttractorNetwork:
+def run_multi_sequence_training(cfg: DemoConfig, sequences: Sequence[np.ndarray]) -> PatternRepetitionNetwork:
     """使用多序列网络一次性训练所有序列。"""
     print("\n=== 多序列联合训练 ===")
     multi_net = build_network(cfg)
@@ -100,7 +83,7 @@ def run_multi_sequence_training(cfg: DemoConfig, sequences: Sequence[np.ndarray]
     return multi_net
 
 
-def run_incremental_batch_training(cfg: DemoConfig, sequences: Sequence[np.ndarray]) -> MemorySequenceAttractorNetwork:
+def run_incremental_batch_training(cfg: DemoConfig, sequences: Sequence[np.ndarray]) -> PatternRepetitionNetwork:
     """
     使用增量网络在一次训练调用中学习所有序列。
 
@@ -125,7 +108,7 @@ def run_incremental_batch_training(cfg: DemoConfig, sequences: Sequence[np.ndarr
     return incremental_net
 
 
-def run_incremental_sequential_training(cfg: DemoConfig, sequences: Sequence[np.ndarray]) -> MemorySequenceAttractorNetwork:
+def run_incremental_sequential_training(cfg: DemoConfig, sequences: Sequence[np.ndarray]) -> PatternRepetitionNetwork:
     """
     使用增量网络逐个新增序列，并在每次添加后进行训练。
     """
@@ -159,17 +142,20 @@ def main() -> None:
     print("=== 序列生成与重复性检查 ===")
     generator = build_network(cfg)
 
+    # 使用 PatternRepetitionNetwork 的方法生成多个序列，并确保跨序列唯一
     sequences = generator.generate_multiple_sequences(
         num_sequences=cfg.num_sequences,
-        seeds=list(cfg.seeds),
+        seeds=cfg.seeds,
         ensure_unique_across=True,
+        verbose=True,
     )
 
-    duplicates = check_no_duplicate_frames(sequences)
-    if duplicates:
-        raise RuntimeError(f"检测到重复帧: {duplicates}")
+    # 使用 PatternRepetitionNetwork 的方法完成重复性检查与报告
+    overlap = generator.analyze_sequence_overlap(sequences)
+    if overlap.get("duplicate_frames", 0) > 0:
+        raise RuntimeError(f"检测到重复帧: {overlap.get('overlap_details', [])}")
 
-    print(f"生成序列数量: {len(sequences)}，每个序列长度: {cfg.T}")
+    print(f"\n生成序列数量: {len(sequences)}，每个序列长度: {cfg.T}")
     print("重复性检查: ✓ 通过（跨序列所有帧均唯一）")
 
     run_multi_sequence_training(cfg, sequences)

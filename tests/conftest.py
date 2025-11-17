@@ -10,7 +10,6 @@ import pytest
 import numpy as np
 from src.core.base import SequenceAttractorNetwork
 from src.models.memory import MemorySequenceAttractorNetwork
-from src.models.multi_sequence import MultiSequenceAttractorNetwork
 from src.models.incremental import IncrementalSequenceAttractorNetwork
 from src.models.pattern_repetition import PatternRepetitionNetwork
 
@@ -45,8 +44,8 @@ def basic_network(basic_network_params):
 
 @pytest.fixture
 def multi_sequence_network(basic_network_params):
-    """多序列网络实例"""
-    return MultiSequenceAttractorNetwork(**basic_network_params)
+    """多序列网络实例（使用 MemorySequenceAttractorNetwork）"""
+    return MemorySequenceAttractorNetwork(**basic_network_params)
 
 
 @pytest.fixture

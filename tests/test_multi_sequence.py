@@ -4,16 +4,16 @@
 
 import pytest
 import numpy as np
-from src.models.multi_sequence import MultiSequenceAttractorNetwork
+from src.models.memory import MemorySequenceAttractorNetwork
 from src.utils.evaluation import evaluate_replay_full_sequence
 
 
 class TestMultiSequenceAttractorNetwork:
-    """多序列吸引子网络测试类"""
+    """多序列吸引子网络测试类（使用 MemorySequenceAttractorNetwork）"""
     
     def test_initialization(self, basic_network_params):
         """测试多序列网络初始化"""
-        network = MultiSequenceAttractorNetwork(**basic_network_params)
+        network = MemorySequenceAttractorNetwork(**basic_network_params)
         
         assert network.N_v == basic_network_params['N_v']
         assert network.T == basic_network_params['T']

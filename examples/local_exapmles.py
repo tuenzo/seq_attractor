@@ -23,9 +23,9 @@ def main() -> None:
         [(4, 4)],  # 序列1的共享模式位置 (start, end)
     ]
     cfg5 = Figure5Config(
-        num_trials=100,
+        num_trials=10,
         noise_num=10,
-        num_epochs=500,
+        num_epochs=100,
         T_values=np.linspace(5, 55, 6, dtype=int),
         N_h_values=np.linspace(100, 1000, 5, dtype=int),
         num_sequences=5,
