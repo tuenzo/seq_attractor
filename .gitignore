@@ -49,6 +49,8 @@ pattern_*.png
 
 # Test reports
 test_reports/
+!test_reports/README.md
+!test_reports/baseline*.json
 
 # Temporary files
 *.tmp
