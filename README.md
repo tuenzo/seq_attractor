@@ -10,13 +10,31 @@
 
 ## 🚀 快速开始
 
-### 安装依赖
+### 方法 1: 一键测试（推荐）
+
+适用于新环境快速验证和性能测试：
 
 ```bash
+# 克隆代码
+git clone https://github.com/tuenzo/seq_attractor.git
+cd seq_attractor
+git checkout optimize/blas
+
+# 创建虚拟环境并安装依赖
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+# 运行自动化测试（生成完整报告）
+python scripts/auto_test.py
+
+# 或快速验证（跳过性能测试）
+python scripts/auto_test.py --quick
 ```
 
-### 基础使用
+**详细指南**: [快速开始](docs/QUICK_START.md) | [跨平台部署](docs/DEPLOYMENT_TESTING_GUIDE.md)
+
+### 方法 2: 手动使用
 
 ```python
 from src import SequenceAttractorNetwork
@@ -42,7 +60,7 @@ print(f"成功率: {result['recall_accuracy']*100:.1f}%")
 python scripts/check_system.py
 
 # 运行性能测试
-python docs/optimization/compare_blas_performance.py
+python scripts/benchmark.py
 ```
 
 ---
@@ -54,9 +72,9 @@ python docs/optimization/compare_blas_performance.py
 | 文档 | 说明 |
 |------|------|
 | **[docs/README.md](docs/README.md)** | 📖 文档导航 |
-| **[docs/QUICK_TEST_GUIDE.md](docs/QUICK_TEST_GUIDE.md)** | 🚀 5分钟快速测试 |
+| **[docs/QUICK_START.md](docs/QUICK_START.md)** | 🚀 快速开始（推荐）|
+| **[docs/QUICK_TEST_GUIDE.md](docs/QUICK_TEST_GUIDE.md)** | ⚡ 5分钟快速测试 |
 | **[docs/DEPLOYMENT_TESTING_GUIDE.md](docs/DEPLOYMENT_TESTING_GUIDE.md)** | 🌐 跨平台部署与测试 |
-| **[docs/optimization/QUICK_SUMMARY.md](docs/optimization/QUICK_SUMMARY.md)** | ⚡ 快速开始（3分钟） |
 | **[docs/optimization/OPTIMIZATION_COMPLETE_SUMMARY.md](docs/optimization/OPTIMIZATION_COMPLETE_SUMMARY.md)** | 📊 性能优化完整总结 |
 | **[docs/optimization/TROUBLESHOOTING.md](docs/optimization/TROUBLESHOOTING.md)** | 🔧 故障排除指南 |
 | **[docs/refactoring/REFACTORING_SUMMARY.md](docs/refactoring/REFACTORING_SUMMARY.md)** | 🏗️ 代码重构说明 |

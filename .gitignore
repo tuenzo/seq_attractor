@@ -47,6 +47,9 @@ docs/results/*.png
 robustness_*.png
 pattern_*.png
 
+# Test reports
+test_reports/
+
 # Temporary files
 *.tmp
 *.bak
