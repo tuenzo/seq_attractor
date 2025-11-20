@@ -233,25 +233,45 @@ def run_benchmark(report_file, json_file):
             report_file.write("| 测试项 | 时间 | 说明 |\n")
             report_file.write("|--------|------|------|\n")
             
+            # 安全获取并格式化数值
+            def safe_format(value, multiplier=1, unit='s', decimals=2):
+                """安全格式化数值，处理可能的字符串或 None 值"""
+                try:
+                    if value is None or value == 'N/A':
+                        return 'N/A'
+                    num_value = float(value) * multiplier
+                    return f"{num_value:.{decimals}f}{unit}"
+                except (ValueError, TypeError):
+                    return str(value)
+            
             if "training_time" in perf_data:
-                report_file.write(f"| 训练 (200轮) | {perf_data['training_time']:.2f}s | - |\n")
+                time_str = safe_format(perf_data['training_time'], 1, 's', 2)
+                report_file.write(f"| 训练 (200轮) | {time_str} | - |\n")
             if "replay_time" in perf_data:
-                report_file.write(f"| 回放 (100步) | {perf_data['replay_time']*1000:.2f}ms | - |\n")
+                time_str = safe_format(perf_data['replay_time'], 1000, 'ms', 2)
+                report_file.write(f"| 回放 (100步) | {time_str} | - |\n")
             if "robustness_test_time" in perf_data:
-                report_file.write(f"| 鲁棒性测试 | {perf_data['robustness_test_time']:.2f}s | - |\n")
+                time_str = safe_format(perf_data['robustness_test_time'], 1, 's', 2)
+                report_file.write(f"| 鲁棒性测试 | {time_str} | - |\n")
             if "total_time" in perf_data:
-                report_file.write(f"| **总计** | **{perf_data['total_time']:.2f}s** | - |\n")
+                time_str = safe_format(perf_data['total_time'], 1, 's', 2)
+                report_file.write(f"| **总计** | **{time_str}** | - |\n")
             
             report_file.write("\n### 准确率\n\n")
             if "replay_accuracy" in perf_data:
-                report_file.write(f"- 回放准确率: {perf_data['replay_accuracy']*100:.1f}%\n")
+                acc_str = safe_format(perf_data['replay_accuracy'], 100, '%', 1)
+                report_file.write(f"- 回放准确率: {acc_str}\n")
             if "robustness_scores" in perf_data and len(perf_data['robustness_scores']) > 0:
-                report_file.write(f"- 无噪声成功率: {perf_data['robustness_scores'][0]*100:.1f}%\n")
+                score_str = safe_format(perf_data['robustness_scores'][0], 100, '%', 1)
+                report_file.write(f"- 无噪声成功率: {score_str}\n")
             
             report_file.write("\n")
             
-            log_info(f"训练时间: {perf_data.get('training_time', 'N/A'):.2f}s", report_file)
-            log_info(f"回放时间: {perf_data.get('replay_time', 'N/A')*1000:.2f}ms", report_file)
+            # 控制台输出也使用安全格式化
+            training_str = safe_format(perf_data.get('training_time'), 1, 's', 2)
+            replay_str = safe_format(perf_data.get('replay_time'), 1000, 'ms', 2)
+            log_info(f"训练时间: {training_str}", report_file)
+            log_info(f"回放时间: {replay_str}", report_file)
             
         except Exception as e:
             log_warning(f"无法解析性能数据: {e}", report_file)
@@ -355,8 +375,13 @@ def compare_with_baseline(current_perf, baseline_data, report_file):
         if metric_key not in baseline_perf or metric_key not in current_perf:
             continue
         
-        baseline_val = baseline_perf[metric_key] * mult
-        current_val = current_perf[metric_key] * mult
+        # 安全转换为数值
+        try:
+            baseline_val = float(baseline_perf[metric_key]) * mult
+            current_val = float(current_perf[metric_key]) * mult
+        except (ValueError, TypeError):
+            log_warning(f"无法对比 {metric_name}: 数据格式错误", report_file)
+            continue
         
         # 计算变化
         if baseline_val != 0:
