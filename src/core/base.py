@@ -6,11 +6,13 @@
 """
 
 import os
-
-os.environ.setdefault("NPY_DISABLE_MAC_OS_ACCELERATE", "1")
-
 import numpy as np
 from typing import Optional, Dict
+
+# 智能 BLAS 配置：自动选择最佳库（Accelerate/MKL/OpenBLAS）
+from ..utils.blas_config import configure_optimal_blas
+_blas_configured = configure_optimal_blas(verbose=False)
+
 from ..utils.evaluation import evaluate_replay_full_sequence
 
 
