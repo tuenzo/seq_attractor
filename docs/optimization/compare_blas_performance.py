@@ -32,7 +32,7 @@ def test_with_accelerate_disabled():
     from src import SequenceAttractorNetwork
     
     # 小规模快速测试
-    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=150, eta=0.01, kappa=1, seed=42)
+    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=150, eta=0.001, kappa=1, seed=42)
     
     # 测试训练性能
     print("训练 100 轮...")
@@ -82,7 +82,7 @@ def test_with_accelerate_enabled():
     from src import SequenceAttractorNetwork
     
     # 相同参数测试
-    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=150, eta=0.01, kappa=1, seed=42)
+    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=150, eta=0.001, kappa=1, seed=42)
     
     # 测试训练性能
     print("训练 100 轮...")
@@ -188,7 +188,7 @@ def main():
     
     # 执行完整测试
     print("\n执行测试...")
-    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=150, eta=0.01, kappa=1, seed=42)
+    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=150, eta=0.001, kappa=1, seed=42)
     
     # 训练
     print("训练 200 轮...")

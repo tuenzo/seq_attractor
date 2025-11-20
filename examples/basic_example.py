@@ -26,7 +26,7 @@ def example_basic_usage():
     print("="*60)
     
     # 创建网络
-    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.01, kappa=1)
+    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001, kappa=1)
     
     # 训练
     print("\n开始训练...")
@@ -60,7 +60,7 @@ def example_multi_sequence():
     print("="*60)
     
     # 创建网络
-    network = MultiSequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.01)
+    network = MultiSequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001)
     
     # 生成多个序列
     print("\n生成多个序列...")
@@ -108,7 +108,7 @@ def example_robustness():
     print("="*60)
     
     # 创建并训练网络
-    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.01)
+    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001)
     network.train(num_epochs=300, seed=42, verbose=False)
     
     # 测试鲁棒性
@@ -137,7 +137,7 @@ def example_incremental_learning():
     print("="*60)
     
     # 创建网络
-    network = IncrementalSequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.01)
+    network = IncrementalSequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001)
     
     # 第一阶段：学习第一个序列
     print("\n【阶段1】学习第一个序列")
@@ -199,7 +199,7 @@ def example_pattern_repetition():
     print("="*60)
     
     # 创建网络
-    network = PatternRepetitionNetwork(N_v=50, T=40, N_h=250, eta=0.01)
+    network = PatternRepetitionNetwork(N_v=50, T=40, N_h=250, eta=0.001)
     
     # 配置不同的模式
     pattern_configs = [

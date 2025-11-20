@@ -22,7 +22,7 @@ pip install -r requirements.txt
 from src import SequenceAttractorNetwork
 
 # 创建网络
-network = SequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.01)
+network = SequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001)
 
 # 训练
 network.train(num_epochs=500, seed=42)

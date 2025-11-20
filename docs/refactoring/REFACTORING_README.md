@@ -55,7 +55,7 @@ from src import (
 from src import SequenceAttractorNetwork, visualize_training_results
 
 # 创建网络
-network = SequenceAttractorNetwork(N_v=50, T=30, eta=0.01)
+network = SequenceAttractorNetwork(N_v=50, T=30, eta=0.001)
 
 # 训练
 train_results = network.train(num_epochs=300, seed=42)
@@ -75,7 +75,7 @@ visualize_training_results(network, xi_replayed, eval_result)
 from src import MultiSequenceAttractorNetwork, visualize_multi_sequence_overview
 
 # 创建网络
-network = MultiSequenceAttractorNetwork(N_v=50, T=30, eta=0.01)
+network = MultiSequenceAttractorNetwork(N_v=50, T=30, eta=0.001)
 
 # 生成多个序列
 sequences = network.generate_multiple_sequences(num_sequences=3, seeds=[100, 200, 300])

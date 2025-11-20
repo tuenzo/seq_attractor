@@ -118,7 +118,7 @@ python basic_example.py
 from src import IncrementalSequenceAttractorNetwork
 
 # 创建网络
-network = IncrementalSequenceAttractorNetwork(N_v=50, T=30, eta=0.01)
+network = IncrementalSequenceAttractorNetwork(N_v=50, T=30, eta=0.001)
 
 # 学习第一个序列
 seq1 = network.generate_random_sequence(seed=100)
@@ -137,7 +137,7 @@ memory_test = network.test_all_memories(verbose=True)
 from src import PatternRepetitionNetwork
 
 # 创建网络
-network = PatternRepetitionNetwork(N_v=50, T=40, eta=0.01)
+network = PatternRepetitionNetwork(N_v=50, T=40, eta=0.001)
 
 # 生成具有不同模式的序列
 pattern_configs = [

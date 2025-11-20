@@ -41,7 +41,7 @@ def benchmark_single_sequence_training(verbose=True):
         print("基准测试 1: 单序列训练")
         print("="*60)
     
-    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.01, kappa=1, seed=42)
+    network = SequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001, kappa=1, seed=42)
     
     start_time = time.time()
     network.train(num_epochs=300, seed=100, verbose=False)
@@ -78,7 +78,7 @@ def benchmark_multi_sequence_training(verbose=True):
         print("基准测试 2: 多序列训练")
         print("="*60)
     
-    network = MemorySequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.01, seed=42)
+    network = MemorySequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001, seed=42)
     
     # 生成3个序列
     sequences = network.generate_multiple_sequences(
