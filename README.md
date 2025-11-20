@@ -69,7 +69,6 @@ python docs/optimization/compare_blas_performance.py
 
 - **`SequenceAttractorNetwork`** - 基础单序列吸引子网络
 - **`MemorySequenceAttractorNetwork`** - 多序列 + 增量记忆核心模块
-- **`MultiSequenceAttractorNetwork`** - 多序列学习（兼容层）
 - **`IncrementalSequenceAttractorNetwork`** - 增量学习（兼容层）
 - **`PatternRepetitionNetwork`** - 支持重复模式与共享片段
 

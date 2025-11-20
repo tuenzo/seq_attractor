@@ -42,6 +42,11 @@ __all__ = [
     'visualize_robustness',
     'visualize_multi_sequence_overview',
     'evaluate_replay_full_sequence',
-    'evaluate_replay_frame_matching'
+    'evaluate_replay_frame_matching',
+    # 兼容性别名（已弃用，请使用 MemorySequenceAttractorNetwork）
+    'MultiSequenceAttractorNetwork'
 ]
+
+# 兼容性别名：MultiSequenceAttractorNetwork -> MemorySequenceAttractorNetwork
+MultiSequenceAttractorNetwork = MemorySequenceAttractorNetwork
 

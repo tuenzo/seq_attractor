@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src import (
     SequenceAttractorNetwork,
-    MultiSequenceAttractorNetwork,
+    MemorySequenceAttractorNetwork,
     IncrementalSequenceAttractorNetwork,
     PatternRepetitionNetwork,
     visualize_training_results,
@@ -60,7 +60,7 @@ def example_multi_sequence():
     print("="*60)
     
     # 创建网络
-    network = MultiSequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001)
+    network = MemorySequenceAttractorNetwork(N_v=50, T=30, N_h=200, eta=0.001)
     
     # 生成多个序列
     print("\n生成多个序列...")

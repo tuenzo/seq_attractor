@@ -41,6 +41,12 @@ figure5_results_local_exapmles/
 benchmark_results/*.json
 docs/results/*.png
 
+# Example outputs
+*_example*.png
+*_overview.png
+robustness_*.png
+pattern_*.png
+
 # Temporary files
 *.tmp
 *.bak
