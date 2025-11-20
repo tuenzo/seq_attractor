@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """
-自动化测试脚本 (Python版本)
+自动化测试脚本 (Python版本) - 增强版
 适用于所有平台（Linux, macOS, Windows）
 
+功能：
+- 运行完整测试套件
+- 生成性能测试报告
+- 自动对比基线性能
+- 支持保存/加载基线
+
 使用方法:
-    python scripts/auto_test.py
-    python scripts/auto_test.py --quick  # 快速测试（跳过性能测试）
+    python scripts/auto_test.py                    # 完整测试
+    python scripts/auto_test.py --quick            # 快速测试（跳过性能测试）
+    python scripts/auto_test.py --save-baseline    # 保存当前结果为基线
+    python scripts/auto_test.py --compare          # 与基线对比
 """
 
 import os
@@ -25,9 +33,11 @@ class Colors:
         GREEN = '\033[0;32m'
         YELLOW = '\033[1;33m'
         BLUE = '\033[0;34m'
+        CYAN = '\033[0;36m'
+        BOLD = '\033[1m'
         NC = '\033[0m'
     else:
-        RED = GREEN = YELLOW = BLUE = NC = ''
+        RED = GREEN = YELLOW = BLUE = CYAN = BOLD = NC = ''
 
 def log_info(msg, report_file=None):
     print(f"{Colors.BLUE}[INFO]{Colors.NC} {msg}")
@@ -50,7 +60,7 @@ def log_error(msg, report_file=None):
         report_file.write(f"[✗] {msg}\n")
 
 def log_section(title, report_file=None):
-    print(f"\n{Colors.BLUE}{title}{Colors.NC}\n")
+    print(f"\n{Colors.BOLD}{Colors.BLUE}{title}{Colors.NC}\n")
     if report_file:
         report_file.write(f"\n## {title}\n\n")
 
@@ -202,7 +212,7 @@ def run_benchmark(report_file, json_file):
     benchmark_path = Path("scripts/benchmark.py")
     if not benchmark_path.exists():
         log_warning("benchmark.py 不存在，跳过性能测试", report_file)
-        return True
+        return True, None
     
     success, stdout, stderr = run_command(
         [sys.executable, "scripts/benchmark.py", "-o", json_file]
@@ -214,49 +224,225 @@ def run_benchmark(report_file, json_file):
         report_file.write(f"- 结果文件: `{Path(json_file).name}`\n\n")
         
         # 解析 JSON 结果
+        perf_data = None
         try:
             with open(json_file, 'r') as f:
-                data = json.load(f)
+                perf_data = json.load(f)
             
             report_file.write("### 性能指标\n\n")
             report_file.write("| 测试项 | 时间 | 说明 |\n")
             report_file.write("|--------|------|------|\n")
             
-            if "training_time" in data:
-                report_file.write(f"| 训练 (200轮) | {data['training_time']:.2f}s | - |\n")
-            if "replay_time" in data:
-                report_file.write(f"| 回放 (100步) | {data['replay_time']*1000:.2f}ms | - |\n")
-            if "robustness_test_time" in data:
-                report_file.write(f"| 鲁棒性测试 | {data['robustness_test_time']:.2f}s | - |\n")
-            if "total_time" in data:
-                report_file.write(f"| **总计** | **{data['total_time']:.2f}s** | - |\n")
+            if "training_time" in perf_data:
+                report_file.write(f"| 训练 (200轮) | {perf_data['training_time']:.2f}s | - |\n")
+            if "replay_time" in perf_data:
+                report_file.write(f"| 回放 (100步) | {perf_data['replay_time']*1000:.2f}ms | - |\n")
+            if "robustness_test_time" in perf_data:
+                report_file.write(f"| 鲁棒性测试 | {perf_data['robustness_test_time']:.2f}s | - |\n")
+            if "total_time" in perf_data:
+                report_file.write(f"| **总计** | **{perf_data['total_time']:.2f}s** | - |\n")
             
             report_file.write("\n### 准确率\n\n")
-            if "replay_accuracy" in data:
-                report_file.write(f"- 回放准确率: {data['replay_accuracy']*100:.1f}%\n")
-            if "robustness_scores" in data and len(data['robustness_scores']) > 0:
-                report_file.write(f"- 无噪声成功率: {data['robustness_scores'][0]*100:.1f}%\n")
+            if "replay_accuracy" in perf_data:
+                report_file.write(f"- 回放准确率: {perf_data['replay_accuracy']*100:.1f}%\n")
+            if "robustness_scores" in perf_data and len(perf_data['robustness_scores']) > 0:
+                report_file.write(f"- 无噪声成功率: {perf_data['robustness_scores'][0]*100:.1f}%\n")
             
             report_file.write("\n")
             
-            log_info(f"训练时间: {data.get('training_time', 'N/A'):.2f}s", report_file)
-            log_info(f"回放时间: {data.get('replay_time', 'N/A')*1000:.2f}ms", report_file)
+            log_info(f"训练时间: {perf_data.get('training_time', 'N/A'):.2f}s", report_file)
+            log_info(f"回放时间: {perf_data.get('replay_time', 'N/A')*1000:.2f}ms", report_file)
             
         except Exception as e:
             log_warning(f"无法解析性能数据: {e}", report_file)
         
-        return True
+        return True, perf_data
     else:
         log_warning("性能测试未能完成", report_file)
         report_file.write("- 状态: 未完成 ⚠\n")
         report_file.write("```\n")
         report_file.write(stderr if stderr else stdout)
         report_file.write("\n```\n\n")
+        return False, None
+
+def save_baseline(perf_data, baseline_file):
+    """保存基线数据"""
+    if perf_data is None:
+        log_error("没有性能数据可以保存为基线")
+        return False
+    
+    try:
+        baseline_data = {
+            'timestamp': datetime.now().isoformat(),
+            'hostname': socket.gethostname().split('.')[0],
+            'system': platform.system(),
+            'python': sys.version.split()[0],
+            'performance': perf_data
+        }
+        
+        # 获取 Git 信息
+        try:
+            success, branch, _ = run_command("git branch --show-current", check=False)
+            if success:
+                baseline_data['git_branch'] = branch.strip()
+            success, commit, _ = run_command("git log --oneline -1", check=False)
+            if success:
+                baseline_data['git_commit'] = commit.strip()
+        except:
+            pass
+        
+        with open(baseline_file, 'w') as f:
+            json.dump(baseline_data, f, indent=2)
+        
+        log_success(f"基线已保存: {baseline_file}")
+        return True
+    except Exception as e:
+        log_error(f"保存基线失败: {e}")
         return False
 
-def generate_summary(report_file, results):
+def load_baseline(baseline_file):
+    """加载基线数据"""
+    try:
+        with open(baseline_file, 'r') as f:
+            baseline_data = json.load(f)
+        log_success(f"基线已加载: {baseline_file}")
+        return baseline_data
+    except FileNotFoundError:
+        log_warning(f"基线文件不存在: {baseline_file}")
+        return None
+    except Exception as e:
+        log_error(f"加载基线失败: {e}")
+        return None
+
+def compare_with_baseline(current_perf, baseline_data, report_file):
+    """对比当前性能与基线"""
+    log_section("5. 基线对比", report_file)
+    
+    if baseline_data is None:
+        log_warning("没有基线数据可供对比", report_file)
+        report_file.write("- 状态: 无基线 ⚠\n\n")
+        report_file.write("> 提示: 使用 `--save-baseline` 保存当前结果为基线\n\n")
+        return
+    
+    baseline_perf = baseline_data.get('performance', {})
+    
+    # 显示基线信息
+    report_file.write("### 基线信息\n\n")
+    report_file.write(f"- 保存时间: {baseline_data.get('timestamp', 'N/A')}\n")
+    report_file.write(f"- 主机: {baseline_data.get('hostname', 'N/A')}\n")
+    report_file.write(f"- 系统: {baseline_data.get('system', 'N/A')}\n")
+    report_file.write(f"- 分支: {baseline_data.get('git_branch', 'N/A')}\n")
+    report_file.write(f"- 提交: {baseline_data.get('git_commit', 'N/A')}\n\n")
+    
+    # 性能对比
+    report_file.write("### 性能对比\n\n")
+    report_file.write("| 测试项 | 基线 | 当前 | 变化 | 加速比 | 状态 |\n")
+    report_file.write("|--------|------|------|------|--------|------|\n")
+    
+    metrics = [
+        ('training_time', '训练时间', 's', False),
+        ('replay_time', '回放时间', 'ms', False, 1000),
+        ('robustness_test_time', '鲁棒性测试', 's', False),
+        ('total_time', '总计时间', 's', False),
+        ('replay_accuracy', '回放准确率', '%', True, 100),
+    ]
+    
+    comparisons = []
+    
+    for metric_key, metric_name, unit, higher_better, *multiplier in metrics:
+        mult = multiplier[0] if multiplier else 1
+        
+        if metric_key not in baseline_perf or metric_key not in current_perf:
+            continue
+        
+        baseline_val = baseline_perf[metric_key] * mult
+        current_val = current_perf[metric_key] * mult
+        
+        # 计算变化
+        if baseline_val != 0:
+            change_pct = ((current_val - baseline_val) / baseline_val) * 100
+            speedup = baseline_val / current_val if current_val != 0 else float('inf')
+        else:
+            change_pct = 0
+            speedup = 1.0
+        
+        # 判断状态
+        if higher_better:
+            # 准确率类指标，越高越好
+            if change_pct > 1:
+                status = "✓ 提升"
+                status_color = Colors.GREEN
+            elif change_pct < -1:
+                status = "✗ 下降"
+                status_color = Colors.RED
+            else:
+                status = "- 持平"
+                status_color = Colors.YELLOW
+        else:
+            # 时间类指标，越低越好
+            if change_pct < -5:
+                status = "✓ 加速"
+                status_color = Colors.GREEN
+            elif change_pct > 5:
+                status = "✗ 变慢"
+                status_color = Colors.RED
+            else:
+                status = "- 持平"
+                status_color = Colors.YELLOW
+        
+        # 格式化输出
+        baseline_str = f"{baseline_val:.2f}{unit}"
+        current_str = f"{current_val:.2f}{unit}"
+        change_str = f"{change_pct:+.1f}%"
+        speedup_str = f"{speedup:.2f}x" if not higher_better else "-"
+        
+        report_file.write(f"| {metric_name} | {baseline_str} | {current_str} | {change_str} | {speedup_str} | {status} |\n")
+        
+        # 控制台输出
+        print(f"{status_color}{status}{Colors.NC} {metric_name}: {baseline_str} -> {current_str} ({change_str})")
+        
+        comparisons.append({
+            'metric': metric_name,
+            'baseline': baseline_val,
+            'current': current_val,
+            'change_pct': change_pct,
+            'speedup': speedup,
+            'status': status,
+            'higher_better': higher_better
+        })
+    
+    report_file.write("\n")
+    
+    # 总结
+    report_file.write("### 对比总结\n\n")
+    
+    improvements = [c for c in comparisons if "提升" in c['status'] or "加速" in c['status']]
+    regressions = [c for c in comparisons if "下降" in c['status'] or "变慢" in c['status']]
+    
+    if improvements:
+        report_file.write("**改进项**:\n")
+        for c in improvements:
+            report_file.write(f"- {c['metric']}: {abs(c['change_pct']):.1f}% {'提升' if c['higher_better'] else '加速'}\n")
+        report_file.write("\n")
+    
+    if regressions:
+        report_file.write("**退化项**:\n")
+        for c in regressions:
+            report_file.write(f"- {c['metric']}: {abs(c['change_pct']):.1f}% {'下降' if c['higher_better'] else '变慢'}\n")
+        report_file.write("\n")
+    
+    if not improvements and not regressions:
+        report_file.write("性能与基线基本持平，无明显变化。\n\n")
+    
+    # 控制台总结
+    print(f"\n{Colors.BOLD}对比总结:{Colors.NC}")
+    print(f"  改进项: {Colors.GREEN}{len(improvements)}{Colors.NC}")
+    print(f"  退化项: {Colors.RED}{len(regressions)}{Colors.NC}")
+    print(f"  持平项: {Colors.YELLOW}{len(comparisons) - len(improvements) - len(regressions)}{Colors.NC}")
+
+def generate_summary(report_file, results, has_comparison=False):
     """生成总结"""
-    log_section("5. 测试总结", report_file)
+    log_section("6. 测试总结" if not has_comparison else "7. 测试总结", report_file)
     
     report_file.write("\n---\n\n")
     report_file.write("## 测试结果汇总\n\n")
@@ -269,8 +455,11 @@ def generate_summary(report_file, results):
     report_file.write(f"**测试完成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
 def main():
-    parser = argparse.ArgumentParser(description='自动化测试脚本')
+    parser = argparse.ArgumentParser(description='自动化测试脚本 - 增强版')
     parser.add_argument('--quick', action='store_true', help='快速测试（跳过性能测试）')
+    parser.add_argument('--save-baseline', action='store_true', help='保存当前测试结果为基线')
+    parser.add_argument('--compare', action='store_true', help='与基线对比')
+    parser.add_argument('--baseline-file', default='test_reports/baseline.json', help='基线文件路径')
     args = parser.parse_args()
     
     # 切换到项目根目录
@@ -287,10 +476,11 @@ def main():
     hostname = socket.gethostname().split('.')[0]
     report_file_path = report_dir / f"test_report_{hostname}_{timestamp}.md"
     json_file_path = report_dir / f"benchmark_{hostname}_{timestamp}.json"
+    baseline_file_path = Path(args.baseline_file)
     
-    print(f"\n{Colors.BLUE}========================================{Colors.NC}")
-    print(f"{Colors.BLUE}  自动化测试脚本 (Python版){Colors.NC}")
-    print(f"{Colors.BLUE}========================================{Colors.NC}\n")
+    print(f"\n{Colors.BOLD}{Colors.BLUE}========================================{Colors.NC}")
+    print(f"{Colors.BOLD}{Colors.BLUE}  自动化测试脚本 (增强版){Colors.NC}")
+    print(f"{Colors.BOLD}{Colors.BLUE}========================================{Colors.NC}\n")
     
     # 初始化报告
     with open(report_file_path, 'w', encoding='utf-8') as rf:
@@ -326,21 +516,35 @@ def main():
         results['功能测试'] = run_functional_tests(rf)
         
         # 性能测试（可选）
+        perf_data = None
         if not args.quick:
-            results['性能基准测试'] = run_benchmark(rf, str(json_file_path))
+            success, perf_data = run_benchmark(rf, str(json_file_path))
+            results['性能基准测试'] = success
         else:
             log_info("跳过性能测试（快速模式）", rf)
         
+        # 基线对比
+        if args.compare and perf_data:
+            baseline_data = load_baseline(baseline_file_path)
+            compare_with_baseline(perf_data, baseline_data, rf)
+        
+        # 保存基线
+        if args.save_baseline and perf_data:
+            if save_baseline(perf_data, baseline_file_path):
+                log_success(f"✓ 基线已保存到: {baseline_file_path}")
+        
         # 生成总结
-        generate_summary(rf, results)
+        generate_summary(rf, results, has_comparison=args.compare)
     
     # 显示报告位置
-    print(f"\n{Colors.GREEN}========================================{Colors.NC}")
-    print(f"{Colors.GREEN}测试完成{Colors.NC}")
-    print(f"{Colors.GREEN}========================================{Colors.NC}\n")
-    print(f"报告位置: {Colors.BLUE}{report_file_path}{Colors.NC}")
+    print(f"\n{Colors.BOLD}{Colors.GREEN}========================================{Colors.NC}")
+    print(f"{Colors.BOLD}{Colors.GREEN}测试完成{Colors.NC}")
+    print(f"{Colors.BOLD}{Colors.GREEN}========================================{Colors.NC}\n")
+    print(f"报告位置: {Colors.CYAN}{report_file_path}{Colors.NC}")
     if not args.quick:
-        print(f"性能数据: {Colors.BLUE}{json_file_path}{Colors.NC}")
+        print(f"性能数据: {Colors.CYAN}{json_file_path}{Colors.NC}")
+    if args.save_baseline:
+        print(f"基线文件: {Colors.CYAN}{baseline_file_path}{Colors.NC}")
     print(f"\n查看报告:\n  cat \"{report_file_path}\"\n")
     
     # 返回测试结果
@@ -349,4 +553,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
