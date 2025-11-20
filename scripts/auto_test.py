@@ -67,20 +67,27 @@ def log_section(title, report_file=None):
 def run_command(cmd, check=True, capture_output=True):
     """运行命令并返回结果"""
     try:
+        # Windows 需要特殊处理编码
+        encoding = 'utf-8' if platform.system() != 'Windows' else 'gbk'
+        
         if isinstance(cmd, str):
             result = subprocess.run(
                 cmd, 
                 shell=True, 
                 check=check, 
                 capture_output=capture_output,
-                text=True
+                text=True,
+                encoding=encoding,
+                errors='ignore'  # 忽略无法解码的字符
             )
         else:
             result = subprocess.run(
                 cmd, 
                 check=check, 
                 capture_output=capture_output,
-                text=True
+                text=True,
+                encoding=encoding,
+                errors='ignore'
             )
         return result.returncode == 0, result.stdout, result.stderr
     except subprocess.CalledProcessError as e:
@@ -157,6 +164,13 @@ def run_functional_tests(report_file):
     log_info("运行基础功能测试...", report_file)
     
     try:
+        # 确保项目根目录在 Python 路径中
+        import sys
+        from pathlib import Path
+        project_root = Path.cwd()
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        
         # 测试导入
         from src import (
             SequenceAttractorNetwork, 
@@ -200,6 +214,17 @@ def run_functional_tests(report_file):
         log_error(f"功能测试失败: {e}", report_file)
         report_file.write(f"- 状态: 失败 ✗\n")
         report_file.write(f"- 错误: {e}\n\n")
+        
+        # 额外的调试信息
+        import sys
+        report_file.write(f"- Python 路径: {sys.path[:3]}...\n")
+        report_file.write(f"- 当前目录: {Path.cwd()}\n")
+        
+        import traceback
+        report_file.write("\n详细错误信息:\n```\n")
+        report_file.write(traceback.format_exc())
+        report_file.write("```\n\n")
+        
         return False
 
 def run_benchmark(report_file, json_file):
