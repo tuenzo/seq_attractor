@@ -739,7 +739,7 @@ def run_figure5_experiments_split_modes(
     show_images: bool = False,
     use_progress: bool = False,
     workers: Optional[int] = None,
-    num_sequences: Optional[int] = None,
+    num_sequences: Optional[int] = 1,
     with_shared_patterns: bool = False,
     shared_pattern_positions: Optional[List[List[Tuple[int, int]]]] = None,
     base_params_a: Optional[Dict] = None,
@@ -766,8 +766,8 @@ def run_figure5_experiments_split_modes(
     print(f"worker_count: {worker_count}")
     
     # 确定多序列参数（优先使用函数参数，否则使用配置）
-    # 如果函数参数和配置都为None，默认使用2个序列
-    actual_num_sequences = num_sequences if num_sequences is not None else (cfg.num_sequences if cfg.num_sequences is not None else 2)
+    # 如果函数参数和配置都为None，默认使用1个序列
+    actual_num_sequences = num_sequences
     actual_with_shared_patterns = with_shared_patterns
     # 如果 with_shared_patterns=True 且 shared_pattern_positions=None，保持 None
     # 让 _single_trial_task 中的逻辑处理默认中间位置

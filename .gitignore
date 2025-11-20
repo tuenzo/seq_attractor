@@ -1,10 +1,52 @@
-__pycache__/SAN_multi_seq_1.cpython-313.pyc
-__pycache__/SeqAttNet2.cpython-313.pyc
-__pycache__/SequenceAttractorNetwork.cpython-313.pyc
-__pycache__/SAN_tensor_1.cpython-313.pyc
-incremental_model/__pycache__/SAN_incremental.cpython-313.pyc
-__pycache__/SequenceAttractorNetwork.cpython-313.pyc
-__pycache__/SequenceAttractorNetwork.cpython-313.pyc
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 *.pyc
-*.cpython-313.pyc
+*.cpython-*.pyc
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# Results and Data
+figure5_results/
+figure5_results_local_exapmles/
+benchmark_results/*.json
+docs/results/*.png
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+test_import.py
+
+# Local examples
 examples/local_exapmles.py
+examples/local_examples.py
