@@ -54,6 +54,8 @@ python docs/optimization/compare_blas_performance.py
 | 文档 | 说明 |
 |------|------|
 | **[docs/README.md](docs/README.md)** | 📖 文档导航 |
+| **[docs/QUICK_TEST_GUIDE.md](docs/QUICK_TEST_GUIDE.md)** | 🚀 5分钟快速测试 |
+| **[docs/DEPLOYMENT_TESTING_GUIDE.md](docs/DEPLOYMENT_TESTING_GUIDE.md)** | 🌐 跨平台部署与测试 |
 | **[docs/optimization/QUICK_SUMMARY.md](docs/optimization/QUICK_SUMMARY.md)** | ⚡ 快速开始（3分钟） |
 | **[docs/optimization/OPTIMIZATION_COMPLETE_SUMMARY.md](docs/optimization/OPTIMIZATION_COMPLETE_SUMMARY.md)** | 📊 性能优化完整总结 |
 | **[docs/optimization/TROUBLESHOOTING.md](docs/optimization/TROUBLESHOOTING.md)** | 🔧 故障排除指南 |
