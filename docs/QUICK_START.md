@@ -410,11 +410,70 @@ print('✓ 基础功能正常')
 
 ---
 
+## 🪟 Windows 特定问题
+
+### Windows 编码问题
+
+**错误**: `UnicodeDecodeError: 'gbk' codec can't decode byte 0xae`
+
+**解决**: 最新版本已自动处理。如果仍有问题：
+```bash
+git pull origin optimize/blas
+```
+
+### Windows 模块导入问题
+
+**错误**: `No module named 'src'`
+
+**解决**:
+```bash
+# 方法 1: 使用批处理脚本（推荐）
+run_test.bat
+
+# 方法 2: 设置环境变量
+set PYTHONPATH=%CD%
+set PYTHONIOENCODING=utf-8
+python scripts/auto_test.py
+
+# 方法 3: 使用 Git Bash（推荐）
+cd /e/path/to/seq_attractor
+export PYTHONPATH=$PWD
+python scripts/auto_test.py
+```
+
+### Windows 虚拟环境
+
+```bash
+# Git Bash
+python -m venv .venv
+source .venv/Scripts/activate
+
+# CMD
+python -m venv .venv
+.venv\Scripts\activate.bat
+
+# PowerShell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+### Windows 一键运行
+
+使用 `run_test.bat` 脚本（自动处理所有 Windows 问题）：
+```bash
+run_test.bat              # 完整测试
+run_test.bat --quick      # 快速测试
+run_test.bat --compare    # 对比基线
+```
+
+---
+
 ## 📞 获取帮助
 
 1. **查看完整文档**
-   - [部署测试指南](DEPLOYMENT_TESTING_GUIDE.md)
+   - [自动化测试指南](AUTO_TEST_USAGE.md)
    - [故障排除](optimization/TROUBLESHOOTING.md)
+   - [性能对比指南](PERFORMANCE_COMPARISON_GUIDE.md)
 
 2. **运行诊断**
    ```bash

@@ -30,7 +30,7 @@ git checkout baseline-before-optimization
 pip install -r requirements.txt
 
 # 3. 运行测试并保存基线
-python scripts/auto_test.py --save-baseline --baseline-file test_reports/baseline_before_blas.json
+python scripts/auto_test.py --save-baseline --baseline-file test_reports/baseline_before_optimize.json
 
 # 4. 查看基线性能
 cat test_reports/test_report_*.md | grep -A 10 "性能指标"
@@ -43,7 +43,7 @@ cat test_reports/test_report_*.md | grep -A 10 "性能指标"
 git checkout optimize/blas
 
 # 2. 运行测试并对比基线
-python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_blas.json
+python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_optimize.json
 
 # 3. 查看对比报告
 cat test_reports/test_report_*.md | grep -A 20 "基线对比"
@@ -119,7 +119,7 @@ git checkout baseline-before-optimization
 
 echo "步骤 2: 运行基线测试..."
 python scripts/auto_test.py --save-baseline \
-    --baseline-file test_reports/baseline_before_blas.json
+    --baseline-file test_reports/baseline_before_optimize.json
 
 echo ""
 echo "步骤 3: 切换回优化分支..."
@@ -127,7 +127,7 @@ git checkout $CURRENT_BRANCH
 
 echo "步骤 4: 运行优化版本测试并对比..."
 python scripts/auto_test.py --compare \
-    --baseline-file test_reports/baseline_before_blas.json
+    --baseline-file test_reports/baseline_before_optimize.json
 
 echo ""
 echo "=== 对比完成 ==="
@@ -148,7 +148,7 @@ chmod +x compare_optimization.sh
 
 ```bash
 # 查看基线文件内容
-cat test_reports/baseline_before_blas.json | python -m json.tool
+cat test_reports/baseline_before_optimize.json | python -m json.tool
 
 # 应该包含：
 # - timestamp: 基线保存时间
@@ -200,7 +200,7 @@ python scripts/check_system.py  # Linux/Mac
 # 3. 运行完整测试并保存基线
 python scripts/auto_test.py \
     --save-baseline \
-    --baseline-file test_reports/baseline_before_blas.json
+    --baseline-file test_reports/baseline_before_optimize.json
 
 # 4. 查看基线结果
 cat test_reports/test_report_*.md | tail -50
@@ -213,7 +213,7 @@ git checkout optimize/blas
 # 6. 运行测试并对比
 python scripts/auto_test.py \
     --compare \
-    --baseline-file test_reports/baseline_before_blas.json
+    --baseline-file test_reports/baseline_before_optimize.json
 
 # 7. 查看对比结果
 cat test_reports/test_report_*.md | grep -A 30 "基线对比"
@@ -223,7 +223,7 @@ cat test_reports/test_report_*.md | grep -A 30 "基线对比"
 # 8. 生成对比摘要
 python -c "
 import json
-with open('test_reports/baseline_before_blas.json') as f:
+with open('test_reports/baseline_before_optimize.json') as f:
     baseline = json.load(f)
 with open('test_reports/benchmark_*.json') as f:  # 最新测试结果
     current = json.load(f)
@@ -256,13 +256,13 @@ print(f\"加速比: {baseline['performance']['training_time'] / current['trainin
 
 ```bash
 # 为不同环境保存不同基线
-baseline_before_blas_mac.json      # Mac 环境基线
-baseline_before_blas_linux.json    # Linux 环境基线
-baseline_before_blas_windows.json  # Windows 环境基线
+baseline_before_optimize_mac.json      # Mac 环境基线
+baseline_before_optimize_linux.json    # Linux 环境基线
+baseline_before_optimize_windows.json  # Windows 环境基线
 
 # 对比时使用对应环境的基线
 python scripts/auto_test.py --compare \
-    --baseline-file test_reports/baseline_before_blas_mac.json
+    --baseline-file test_reports/baseline_before_optimize_mac.json
 ```
 
 ### 3. Git 状态
@@ -313,7 +313,7 @@ cat test_reports/baseline_before.json | python -m json.tool | grep -E "timestamp
 
 **或者**：如果基线已经保存过，可以直接在当前分支对比：
 ```bash
-python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_blas.json
+python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_optimize.json
 ```
 
 ---

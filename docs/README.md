@@ -1,194 +1,195 @@
-# 项目文档目录
+# 📚 项目文档导航
 
-本目录包含项目的所有文档，按主题分类。
-
-## 📁 目录结构
-
-```
-docs/
-├── README.md                    # 本文件
-├── optimization/                # 性能优化相关文档
-│   ├── OPTIMIZATION_COMPLETE_SUMMARY.md  # 优化完整总结 ⭐
-│   ├── QUICK_SUMMARY.md                  # 快速开始指南
-│   ├── OPTIMIZATION_STATUS.md            # 优化进度跟踪
-│   ├── OPTIMIZATION_PLAN.md              # 优化计划
-│   ├── OPTIMIZATION_QUICKSTART.md        # 快速操作指南
-│   ├── PERFORMANCE_COMPARISON_REPORT.md  # 性能测试报告
-│   ├── TROUBLESHOOTING.md                # 故障排除指南
-│   ├── VERSION_MANAGEMENT_SETUP.md       # 版本管理说明
-│   └── compare_blas_performance.py       # 性能对比脚本
-├── refactoring/                 # 代码重构相关文档
-│   ├── REFACTORING_SUMMARY.md           # 重构总结
-│   ├── REFACTORING_README.md            # 重构说明
-│   └── REFACTORING_CHANGES.md           # 重构变更记录
-└── results/                     # 实验结果和图片
-    ├── pattern_shared_demo.png
-    └── pattern_shared_overview.png
-```
+欢迎！这里是序列吸引子网络项目的完整文档中心。
 
 ---
 
 ## 🚀 快速开始
 
 ### 新用户？从这里开始
-1. **[QUICK_SUMMARY.md](optimization/QUICK_SUMMARY.md)** - 3分钟了解优化
-2. **[OPTIMIZATION_COMPLETE_SUMMARY.md](optimization/OPTIMIZATION_COMPLETE_SUMMARY.md)** - 完整总结
 
-### 需要优化？
-1. **[OPTIMIZATION_PLAN.md](optimization/OPTIMIZATION_PLAN.md)** - 查看优化路线图
-2. **[OPTIMIZATION_QUICKSTART.md](optimization/OPTIMIZATION_QUICKSTART.md)** - 快速操作指南
+1. **[快速开始指南](QUICK_START.md)** ⭐⭐⭐⭐⭐
+   - 一键测试和部署
+   - 所有平台（Linux、macOS、Windows）
+   - 常见问题解决方案
+   - **推荐首先阅读**
 
-### 遇到问题？
-1. **[TROUBLESHOOTING.md](optimization/TROUBLESHOOTING.md)** - 故障排除（7种方案）
-
-### 查看性能？
-1. **[PERFORMANCE_COMPARISON_REPORT.md](optimization/PERFORMANCE_COMPARISON_REPORT.md)** - 详细测试报告
-
----
-
-## 📖 文档分类
-
-### 优化文档 (optimization/)
-
-#### 核心文档
-- **OPTIMIZATION_COMPLETE_SUMMARY.md** ⭐⭐⭐⭐⭐
-  - 第一个优化的完整总结
-  - 包含测试结果、核心价值、使用指南
-  - 推荐首先阅读
-
-- **QUICK_SUMMARY.md** ⭐⭐⭐⭐⭐
-  - 5分钟快速了解
-  - 完成工作、当前问题、下一步操作
-
-- **PERFORMANCE_COMPARISON_REPORT.md** ⭐⭐⭐⭐
-  - 详细的性能测试报告
-  - 对比数据、分析说明
-  - 跨平台性能预期
-
-#### 操作指南
-- **OPTIMIZATION_QUICKSTART.md**
-  - 快速操作步骤
-  - Git 命令速查
-  - 最佳实践
-
-- **TROUBLESHOOTING.md**
-  - NumPy 段错误解决（7种方案）
-  - macOS/Linux/GPU 环境配置
-  - 诊断工具和命令
-
-- **VERSION_MANAGEMENT_SETUP.md**
-  - Git 分支管理详解
-  - 文件备份方案
-  - 版本对比方法
-
-#### 规划文档
-- **OPTIMIZATION_PLAN.md**
-  - 7个优化方案详细规划
-  - 预期加速比
-  - 实施优先级
-
-- **OPTIMIZATION_STATUS.md**
-  - 优化进度跟踪
-  - 已完成/待实施列表
-  - 测试清单
-
-#### 工具脚本
-- **compare_blas_performance.py**
-  - 性能对比测试脚本
-  - 自动化测试流程
-  - 结果分析和展示
+2. **[基线测试指南](BASELINE_TESTING.md)**
+   - 如何在基线版本运行测试
+   - 创建性能基线
+   - 用于后续优化对比
 
 ---
 
-### 重构文档 (refactoring/)
+## 📊 性能测试与对比
 
-- **REFACTORING_SUMMARY.md**
-  - 代码重构总结
-  - 新架构说明
-  - API 变更
+### 自动化测试
 
-- **REFACTORING_README.md**
-  - 重构概述
-  - 使用指南
+1. **[自动化测试使用指南](AUTO_TEST_USAGE.md)** ⭐⭐⭐⭐
+   - 完整测试流程
+   - 基线保存和性能对比
+   - 详细使用示例
 
-- **REFACTORING_CHANGES.md**
-  - 详细变更记录
-  - 迁移指南
+2. **[性能对比指南](PERFORMANCE_COMPARISON_GUIDE.md)** ⭐⭐⭐⭐
+   - 如何对比优化前后性能
+   - 使用基线标签
+   - 跨环境对比
 
----
-
-### 结果文件 (results/)
-
-存储实验结果图片和数据文件。
-
-**注意**：大型结果文件（如 figure5_results/）在项目根目录，已添加到 .gitignore。
+3. **[基线测试指南](BASELINE_TESTING.md)**
+   - 基线版本测试方法
+   - 生成基线数据
 
 ---
 
-## 🔍 如何查找文档
+## 🔧 故障排除
 
-### 按需求查找
-
-| 需求 | 推荐文档 |
-|------|---------|
-| 了解优化成果 | OPTIMIZATION_COMPLETE_SUMMARY.md |
-| 快速上手 | QUICK_SUMMARY.md |
-| 解决环境问题 | TROUBLESHOOTING.md |
-| 查看性能数据 | PERFORMANCE_COMPARISON_REPORT.md |
-| 学习 Git 管理 | VERSION_MANAGEMENT_SETUP.md |
-| 规划下一步 | OPTIMIZATION_PLAN.md |
-| 跟踪进度 | OPTIMIZATION_STATUS.md |
-| 了解重构 | REFACTORING_SUMMARY.md |
-
-### 按角色查找
-
-**研究人员/用户**
-1. QUICK_SUMMARY.md - 快速了解
-2. OPTIMIZATION_PLAN.md - 查看路线图
-3. PERFORMANCE_COMPARISON_REPORT.md - 性能数据
-
-**开发者/贡献者**
-1. REFACTORING_SUMMARY.md - 了解架构
-2. VERSION_MANAGEMENT_SETUP.md - Git 工作流
-3. TROUBLESHOOTING.md - 环境配置
-
-**系统管理员**
-1. TROUBLESHOOTING.md - 环境部署
-2. OPTIMIZATION_STATUS.md - 系统要求
-3. PERFORMANCE_COMPARISON_REPORT.md - 性能基准
+1. **[故障排除指南](optimization/TROUBLESHOOTING.md)** ⭐⭐⭐⭐⭐
+   - 常见问题解决方案
+   - 环境配置问题
+   - 诊断工具和命令
+   - **遇到问题先看这里**
 
 ---
 
-## 📝 文档维护
+## ⚡ 性能优化
 
-### 文档更新规则
-1. 每个优化完成后更新 OPTIMIZATION_STATUS.md
-2. 性能测试后更新 PERFORMANCE_COMPARISON_REPORT.md
-3. 新问题添加到 TROUBLESHOOTING.md
-4. Git 工作流变化更新 VERSION_MANAGEMENT_SETUP.md
+### 优化文档
 
-### 文档格式
-- 使用 Markdown 格式
-- 包含清晰的标题结构
-- 添加表格和代码示例
-- 使用 emoji 增强可读性
+1. **[优化完整总结](optimization/OPTIMIZATION_COMPLETE_SUMMARY.md)** ⭐⭐⭐⭐⭐
+   - 第一个优化（BLAS）的完整总结
+   - 性能测试结果
+   - 核心价值和使用指南
+   - **推荐阅读**
 
----
-
-## 🌟 重要提示
-
-1. **OPTIMIZATION_COMPLETE_SUMMARY.md** 是最全面的总结文档
-2. **QUICK_SUMMARY.md** 适合快速查看
-3. 遇到问题先查 **TROUBLESHOOTING.md**
-4. 所有测试脚本在 `../scripts/` 目录
+2. **[优化计划](optimization/OPTIMIZATION_PLAN.md)** ⭐⭐⭐⭐
+   - 7 个优化阶段详细规划
+   - 预期加速比
+   - 实施优先级
 
 ---
 
-## 📞 需要帮助？
+## 📁 文档结构
 
-查看文档后仍有疑问？
+```
+docs/
+├── README.md                          # 本文件 - 文档导航
+├── QUICK_START.md                     # ⭐ 快速开始（整合版）
+├── BASELINE_TESTING.md                # 基线测试指南
+├── AUTO_TEST_USAGE.md                 # 自动化测试使用指南
+├── PERFORMANCE_COMPARISON_GUIDE.md    # 性能对比指南
+│
+├── optimization/                      # 性能优化文档
+│   ├── OPTIMIZATION_COMPLETE_SUMMARY.md  # ⭐ 优化完整总结
+│   ├── OPTIMIZATION_PLAN.md              # 优化计划
+│   └── TROUBLESHOOTING.md                # ⭐ 故障排除指南
+│
+├── archive/                           # 归档文档
+│   ├── optimization/                 # 已归档的优化文档
+│   └── refactoring/                  # 已归档的重构文档
+│
+└── results/                           # 实验结果
+    └── *.png                          # 实验图片
+```
 
-1. 检查 TROUBLESHOOTING.md
-2. 运行 `python scripts/check_system.py` 诊断环境
-3. 查看 Git 提交历史了解变更
+---
 
+## 🎯 按需求查找文档
+
+| 需求 | 推荐文档 | 优先级 |
+|------|---------|--------|
+| **快速上手** | [QUICK_START.md](QUICK_START.md) | ⭐⭐⭐⭐⭐ |
+| **遇到问题** | [TROUBLESHOOTING.md](optimization/TROUBLESHOOTING.md) | ⭐⭐⭐⭐⭐ |
+| **了解优化成果** | [OPTIMIZATION_COMPLETE_SUMMARY.md](optimization/OPTIMIZATION_COMPLETE_SUMMARY.md) | ⭐⭐⭐⭐⭐ |
+| **运行测试** | [AUTO_TEST_USAGE.md](AUTO_TEST_USAGE.md) | ⭐⭐⭐⭐ |
+| **对比性能** | [PERFORMANCE_COMPARISON_GUIDE.md](PERFORMANCE_COMPARISON_GUIDE.md) | ⭐⭐⭐⭐ |
+| **查看优化计划** | [OPTIMIZATION_PLAN.md](optimization/OPTIMIZATION_PLAN.md) | ⭐⭐⭐⭐ |
+| **基线测试** | [BASELINE_TESTING.md](BASELINE_TESTING.md) | ⭐⭐⭐ |
+
+---
+
+## 🔍 按角色查找
+
+### 新用户 / 研究人员
+
+1. [QUICK_START.md](QUICK_START.md) - 快速开始
+2. [OPTIMIZATION_COMPLETE_SUMMARY.md](optimization/OPTIMIZATION_COMPLETE_SUMMARY.md) - 了解优化成果
+3. [OPTIMIZATION_PLAN.md](optimization/OPTIMIZATION_PLAN.md) - 查看优化路线图
+
+### 开发者 / 贡献者
+
+1. [AUTO_TEST_USAGE.md](AUTO_TEST_USAGE.md) - 自动化测试
+2. [PERFORMANCE_COMPARISON_GUIDE.md](PERFORMANCE_COMPARISON_GUIDE.md) - 性能对比
+3. [BASELINE_TESTING.md](BASELINE_TESTING.md) - 基线测试
+
+### 系统管理员
+
+1. [QUICK_START.md](QUICK_START.md) - 部署指南
+2. [TROUBLESHOOTING.md](optimization/TROUBLESHOOTING.md) - 环境配置
+3. [AUTO_TEST_USAGE.md](AUTO_TEST_USAGE.md) - 测试流程
+
+---
+
+## 📝 文档更新说明
+
+### 活跃文档（当前维护）
+
+- ✅ `QUICK_START.md` - 整合了所有快速开始、部署、Windows 设置内容
+- ✅ `AUTO_TEST_USAGE.md` - 自动化测试完整指南
+- ✅ `PERFORMANCE_COMPARISON_GUIDE.md` - 性能对比指南
+- ✅ `BASELINE_TESTING.md` - 基线测试指南
+- ✅ `optimization/OPTIMIZATION_COMPLETE_SUMMARY.md` - 优化总结
+- ✅ `optimization/OPTIMIZATION_PLAN.md` - 优化计划
+- ✅ `optimization/TROUBLESHOOTING.md` - 故障排除
+
+### 归档文档（历史参考）
+
+已归档到 `docs/archive/` 目录的文档：
+- `DEPLOYMENT_TESTING_GUIDE.md` → 内容已整合到 `QUICK_START.md`
+- `QUICK_TEST_GUIDE.md` → 内容已整合到 `QUICK_START.md`
+- `WINDOWS_SETUP.md` → 内容已整合到 `QUICK_START.md`
+- `READY_FOR_DEPLOYMENT.md` → 临时文档，已归档
+- `optimization/QUICK_SUMMARY.md` → 内容已整合到 `OPTIMIZATION_COMPLETE_SUMMARY.md`
+- `optimization/OPTIMIZATION_QUICKSTART.md` → 内容已整合到 `QUICK_START.md`
+- `optimization/OPTIMIZATION_STATUS.md` → 状态文档，已归档
+- `optimization/VERSION_MANAGEMENT_SETUP.md` → 内容已整合到其他文档
+- `optimization/PERFORMANCE_COMPARISON_REPORT.md` → 历史报告，已归档
+- `refactoring/*` → 重构文档，已归档
+
+---
+
+## 🆘 需要帮助？
+
+### 1. 查看文档
+
+- 遇到问题 → [TROUBLESHOOTING.md](optimization/TROUBLESHOOTING.md)
+- 快速开始 → [QUICK_START.md](QUICK_START.md)
+- 测试问题 → [AUTO_TEST_USAGE.md](AUTO_TEST_USAGE.md)
+
+### 2. 运行诊断
+
+```bash
+# 系统环境检查
+python scripts/check_system.py
+
+# Windows 环境检查
+python check_windows.py
+```
+
+### 3. 提交 Issue
+
+- GitHub: https://github.com/tuenzo/seq_attractor/issues
+- 附上错误信息和系统信息
+
+---
+
+## 📌 重要提示
+
+1. **首次使用**：先阅读 [QUICK_START.md](QUICK_START.md)
+2. **遇到问题**：先查看 [TROUBLESHOOTING.md](optimization/TROUBLESHOOTING.md)
+3. **运行测试**：使用 `python scripts/auto_test.py`
+4. **对比性能**：使用 `--compare` 选项
+
+---
+
+**最后更新**: 2025-11-20  
+**维护状态**: 活跃维护中 ✅

@@ -39,7 +39,7 @@ echo ""
 echo -e "${BLUE}步骤 2: 运行基线测试...${NC}"
 echo "这可能需要几分钟..."
 python scripts/auto_test.py --save-baseline \
-    --baseline-file test_reports/baseline_before_blas.json
+    --baseline-file test_reports/baseline_before_optimize.json
 
 if [ $? -ne 0 ]; then
     echo -e "${YELLOW}⚠ 基线测试失败，但继续执行...${NC}"
@@ -52,7 +52,7 @@ git checkout "$CURRENT_BRANCH"
 echo ""
 echo -e "${BLUE}步骤 4: 运行优化版本测试并对比...${NC}"
 python scripts/auto_test.py --compare \
-    --baseline-file test_reports/baseline_before_blas.json
+    --baseline-file test_reports/baseline_before_optimize.json
 
 echo ""
 echo -e "${GREEN}=== 对比完成 ===${NC}"

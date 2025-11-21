@@ -72,12 +72,13 @@ python scripts/benchmark.py
 | 文档 | 说明 |
 |------|------|
 | **[docs/README.md](docs/README.md)** | 📖 文档导航 |
-| **[docs/QUICK_START.md](docs/QUICK_START.md)** | 🚀 快速开始（推荐）|
-| **[docs/QUICK_TEST_GUIDE.md](docs/QUICK_TEST_GUIDE.md)** | ⚡ 5分钟快速测试 |
-| **[docs/DEPLOYMENT_TESTING_GUIDE.md](docs/DEPLOYMENT_TESTING_GUIDE.md)** | 🌐 跨平台部署与测试 |
-| **[docs/optimization/OPTIMIZATION_COMPLETE_SUMMARY.md](docs/optimization/OPTIMIZATION_COMPLETE_SUMMARY.md)** | 📊 性能优化完整总结 |
+| **[docs/QUICK_START.md](docs/QUICK_START.md)** | 🚀 快速开始（推荐）⭐ |
+| **[docs/AUTO_TEST_USAGE.md](docs/AUTO_TEST_USAGE.md)** | 🤖 自动化测试使用指南 |
+| **[docs/PERFORMANCE_COMPARISON_GUIDE.md](docs/PERFORMANCE_COMPARISON_GUIDE.md)** | 📊 性能对比指南 |
+| **[docs/BASELINE_TESTING.md](docs/BASELINE_TESTING.md)** | 🎯 基线测试指南 |
+| **[docs/optimization/OPTIMIZATION_COMPLETE_SUMMARY.md](docs/optimization/OPTIMIZATION_COMPLETE_SUMMARY.md)** | ⚡ 性能优化完整总结 |
+| **[docs/optimization/OPTIMIZATION_PLAN.md](docs/optimization/OPTIMIZATION_PLAN.md)** | 📋 优化计划 |
 | **[docs/optimization/TROUBLESHOOTING.md](docs/optimization/TROUBLESHOOTING.md)** | 🔧 故障排除指南 |
-| **[docs/refactoring/REFACTORING_SUMMARY.md](docs/refactoring/REFACTORING_SUMMARY.md)** | 🏗️ 代码重构说明 |
 
 ---
 

@@ -56,7 +56,7 @@ def run_benchmark():
     # 生成文件名
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     hostname = socket.gethostname().split('.')[0]
-    json_file = results_dir / f"baseline_before_blas_{hostname}_{timestamp}.json"
+    json_file = results_dir / f"baseline_before_optimize_{hostname}_{timestamp}.json"
     
     results = {
         "system_info": {
@@ -163,10 +163,10 @@ def run_benchmark():
     print()
     print("下一步:")
     print("  1. 将此文件复制为基线文件:")
-    print(f"     cp {json_file} test_reports/baseline_before_blas.json")
-    print("  2. 切换回 optimize/blas 分支")
+    print(f"     cp {json_file} test_reports/baseline_before_optimize.json")
+    print("  2. 切换回优化分支（如 optimize/blas）")
     print("  3. 运行对比测试:")
-    print("     python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_blas.json")
+    print("     python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_optimize.json")
     
     return json_file
 

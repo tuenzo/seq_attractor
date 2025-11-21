@@ -26,11 +26,11 @@ git checkout baseline-before-optimization
 bash scripts/create_baseline.sh
 
 # 3. 复制生成的 JSON 文件为基线
-cp test_reports/baseline_before_blas_*.json test_reports/baseline_before_blas.json
+cp test_reports/baseline_before_optimize_*.json test_reports/baseline_before_optimize.json
 
 # 4. 切换回优化分支并对比
 git checkout optimize/blas
-python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_blas.json
+python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_optimize.json
 ```
 
 ### 方法 2: 手动运行
@@ -45,13 +45,13 @@ python scripts/baseline_test.py
 # 3. 查看生成的 JSON 文件路径（脚本会输出）
 
 # 4. 复制为基线文件
-cp test_reports/baseline_before_blas_*.json test_reports/baseline_before_blas.json
+cp test_reports/baseline_before_optimize_*.json test_reports/baseline_before_optimize.json
 
 # 5. 切换回优化分支
 git checkout optimize/blas
 
 # 6. 运行对比
-python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_blas.json
+python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_optimize.json
 ```
 
 ---
@@ -125,20 +125,20 @@ python scripts/baseline_test.py
   总计: 97.00s
   准确率: 100.0%
 
-结果已保存: test_reports/baseline_before_blas_hostname_20251120_123456.json
+结果已保存: test_reports/baseline_before_optimize_hostname_20251120_123456.json
 ```
 
 ### 步骤 3: 保存基线文件
 
 ```bash
 # 找到最新生成的基线文件
-LATEST_BASELINE=$(ls -t test_reports/baseline_before_blas_*.json | head -1)
+LATEST_BASELINE=$(ls -t test_reports/baseline_before_optimize_*.json | head -1)
 
 # 复制为标准基线文件名
-cp "$LATEST_BASELINE" test_reports/baseline_before_blas.json
+cp "$LATEST_BASELINE" test_reports/baseline_before_optimize.json
 
 # 验证
-cat test_reports/baseline_before_blas.json | python -m json.tool | head -20
+cat test_reports/baseline_before_optimize.json | python -m json.tool | head -20
 ```
 
 ### 步骤 4: 切换回优化分支并对比
@@ -149,7 +149,7 @@ git checkout optimize/blas
 
 # 运行对比测试
 python scripts/auto_test.py --compare \
-    --baseline-file test_reports/baseline_before_blas.json
+    --baseline-file test_reports/baseline_before_optimize.json
 
 # 查看对比结果
 cat test_reports/test_report_*.md | grep -A 30 "基线对比"
@@ -220,10 +220,10 @@ cat test_reports/test_report_*.md | grep -A 30 "基线对比"
 基线文件应该保存在 `test_reports/` 目录下，文件名建议：
 
 ```
-baseline_before_blas.json              # 默认名称
-baseline_before_blas_mac.json          # Mac 环境
-baseline_before_blas_linux.json        # Linux 环境
-baseline_before_blas_windows.json      # Windows 环境
+baseline_before_optimize.json              # 默认名称（通用，适用于所有优化阶段）
+baseline_before_optimize_mac.json          # Mac 环境
+baseline_before_optimize_linux.json         # Linux 环境
+baseline_before_optimize_windows.json       # Windows 环境
 ```
 
 ### 3. Git 状态
@@ -309,11 +309,11 @@ git checkout baseline-before-optimization
 python scripts/baseline_test.py
 
 # 3. 保存基线文件
-cp test_reports/baseline_before_blas_*.json \
-   test_reports/baseline_before_blas.json
+cp test_reports/baseline_before_optimize_*.json \
+   test_reports/baseline_before_optimize.json
 
 # 4. 验证基线文件
-cat test_reports/baseline_before_blas.json | python -m json.tool
+cat test_reports/baseline_before_optimize.json | python -m json.tool
 
 # === 阶段 2: 优化版本测试 ===
 
@@ -322,7 +322,7 @@ git checkout optimize/blas
 
 # 6. 运行对比测试
 python scripts/auto_test.py --compare \
-    --baseline-file test_reports/baseline_before_blas.json
+    --baseline-file test_reports/baseline_before_optimize.json
 
 # 7. 查看对比结果
 cat test_reports/test_report_*.md | grep -A 30 "基线对比"
@@ -336,11 +336,11 @@ cat test_reports/test_report_*.md | grep -A 30 "基线对比"
 # === 创建基线 ===
 git checkout baseline-before-optimization
 python scripts/baseline_test.py
-cp test_reports/baseline_before_blas_*.json test_reports/baseline_before_blas.json
+cp test_reports/baseline_before_optimize_*.json test_reports/baseline_before_optimize.json
 
 # === 对比性能 ===
 git checkout optimize/blas
-python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_blas.json
+python scripts/auto_test.py --compare --baseline-file test_reports/baseline_before_optimize.json
 
 # === 查看结果 ===
 cat test_reports/test_report_*.md | grep -A 30 "基线对比"
