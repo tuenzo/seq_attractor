@@ -1,8 +1,5 @@
-"""
-核心网络类模块
-"""
+"""核心网络类模块"""
 
-from .base import SequenceAttractorNetwork
+from .network import SequenceAttractorNetwork
 
-__all__ = ['SequenceAttractorNetwork']
-
+__all__ = ["SequenceAttractorNetwork"]

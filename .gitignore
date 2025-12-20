@@ -5,7 +5,6 @@ __pycache__/
 *.so
 .Python
 *.pyc
-*.cpython-*.pyc
 
 # Virtual Environment
 .venv/
@@ -35,19 +34,20 @@ htmlcov/
 .ipynb_checkpoints/
 *.ipynb
 
-# Results and Data
+# Output directory (generated files)
+output/
+
+# Legacy result directories (to be cleaned)
 figure5_results/
 figure5_results_local_exapmles/
+
+# Generated images in root
+*.png
+
+# Benchmark results (keep README)
 benchmark_results/*.json
-docs/results/*.png
 
-# Example outputs
-*_example*.png
-*_overview.png
-robustness_*.png
-pattern_*.png
-
-# Test reports
+# Test reports (keep README and baseline)
 test_reports/
 !test_reports/README.md
 !test_reports/baseline*.json
@@ -56,8 +56,6 @@ test_reports/
 *.tmp
 *.bak
 *.log
-test_import.py
 
-# Local examples
-examples/local_exapmles.py
-examples/local_examples.py
+# Local/temp files
+test_import.py

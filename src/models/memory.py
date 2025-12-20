@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from ..core.base import SequenceAttractorNetwork
+from ..core.network import SequenceAttractorNetwork
 from ..utils.evaluation import evaluate_replay_full_sequence
 
 

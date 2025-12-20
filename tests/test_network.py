@@ -4,7 +4,7 @@
 
 import pytest
 import numpy as np
-from src.core.base import SequenceAttractorNetwork
+from src.core.network import SequenceAttractorNetwork
 from src.utils.evaluation import evaluate_replay_full_sequence
 
 

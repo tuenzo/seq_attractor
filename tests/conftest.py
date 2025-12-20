@@ -8,10 +8,10 @@ os.environ.setdefault("NPY_DISABLE_MAC_OS_ACCELERATE", "1")
 
 import pytest
 import numpy as np
-from src.core.base import SequenceAttractorNetwork
+from src.core.network import SequenceAttractorNetwork
 from src.models.memory import MemorySequenceAttractorNetwork
 from src.models.incremental import IncrementalSequenceAttractorNetwork
-from src.models.pattern_repetition import PatternRepetitionNetwork
+from src.models.pattern import PatternRepetitionNetwork
 
 
 @pytest.fixture

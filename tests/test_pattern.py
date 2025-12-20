@@ -4,7 +4,7 @@
 
 import pytest
 import numpy as np
-from src.models.pattern_repetition import PatternRepetitionNetwork
+from src.models.pattern import PatternRepetitionNetwork
 from src.utils.evaluation import evaluate_replay_full_sequence
 
 

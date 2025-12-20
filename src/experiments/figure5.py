@@ -21,7 +21,7 @@ try:
 except Exception:  # pragma: no cover - tqdm is optional at runtime
     tqdm = None
 
-from ..models.pattern_repetition import PatternRepetitionNetwork
+from ..models.pattern import PatternRepetitionNetwork
 
 
 @dataclass(frozen=True)

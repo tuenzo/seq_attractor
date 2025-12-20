@@ -4,7 +4,7 @@
 
 from .memory import MemorySequenceAttractorNetwork
 from .incremental import IncrementalSequenceAttractorNetwork
-from .pattern_repetition import PatternRepetitionNetwork
+from .pattern import PatternRepetitionNetwork
 
 __all__ = [
     'MemorySequenceAttractorNetwork',
